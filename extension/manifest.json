@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "MMarkit - Bookmark Manager",
+  "version": "1.0.0",
+  "description": "A simple, modern bookmark manager that syncs with MMarkit web app.",
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "action": {
+    "default_title": "Open MMarkit Side Panel",
+    "default_icon": {
+      "16": "assets/icon16_1767721345187.png",
+      "32": "assets/icon32_1767721345186.png",
+      "48": "assets/icon48_1767721345185.png",
+      "128": "assets/icon128_1767721345183.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "icons": {
+      "16": "assets/icon16_1767721345187.png",
+      "32": "assets/icon32_1767721345186.png",
+      "48": "assets/icon48_1767721345185.png",
+      "128": "assets/icon128_1767721345183.png"
+  }
+}
