@@ -1,0 +1,75 @@
+You are building a simple, modern bookmark web application and extension with seamless user auth across the app and extension.
+
+Goal: Create a web app that lets a user save and organize bookmarks.
+
+A bookmark is a URL plus user-written notes and tags. This app will later integrate with a browser extension sidebar, so design the app with a clean authenticated API that an extension can call, and make sure all decisions revolve around the web app and extension working seamlessly to allow the user to store and manage bookmarks.
+
+Primary user story: “As a logged-in user, I can quickly save a URL with an optional short note and/or a few tags. I should later be able to easily find that bookmark using search and filters.”
+
+Information architecture:
+
+User: owns all data.
+
+Bookmark: { id, ownerId, url (required), title (auto-fetch open graph details and any other available public schema when possible use google best practices), notes (rich text/markdown), tags (many), createdAt, updatedAt, savedFrom (web|extension), public/private (boolean)}.
+
+Tag: { id, ownerId, name }.
+
+MVP requirements:
+
+Authentication + user accounts:
+
+Users can sign up/sign in and only see their own bookmarks.
+
+Logged out users can see a feed of most recent public bookmarks
+
+Core CRUD:
+
+Create bookmark with url + notes + tags
+
+Edit bookmark (notes/tags) and delete bookmark
+
+Bookmarks can be public or private
+
+Basic tag management (create/rename/delete)
+
+Library UX:
+
+Main library page shows bookmarks (newest first).
+
+Search across title/url/notes/Page metadata (open graph details if available)
+
+Filter by folder and by tag(s).
+
+Simple, modern UI with fast interactions and optimistic UI updates so everything feels instant and snappy.
+
+Ideally shared components across web app and extension so saving a bookmark feels seamless across either surface
+
+Extension-ready API (lightweight):
+
+Provide authenticated endpoints to:
+
+create/edit/delete bookmarks
+
+list/search bookmarks
+
+list tags
+
+Extension
+
+Simple /extension folder with all bundled files
+
+Complete extension code with:
+
+manifest.json
+
+service worker/background scripts as needed
+
+side panel UI (HTML/CSS/JS or React—your choice)
+
+API client module
+
+auth module + storage (use the best option to align extension sessions with the app auth so they work together seamlessly)
+
+Deliverable:
+
+Working web app with auth, bookmark CRUD, folders/tags, search + filters, and authenticated API endpoints and simple vanilla.JS browser extension which uses Manifest 3 and sidepanel to persist across tabs as the user browses so there is always an easy way to grab a bookmark, add a tag or leave a note from the browser.
