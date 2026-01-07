@@ -7,7 +7,7 @@ import {
   type Tag,
   type Bookmark
 } from "@shared/schema";
-import { eq, desc, and, ilike, sql } from "drizzle-orm";
+import { eq, desc, and, ilike, sql, or } from "drizzle-orm";
 import { users, type User } from "@shared/models/auth";
 
 export interface IStorage {
@@ -30,7 +30,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBookmarks(userId: string, options?: { search?: string, tag?: string }): Promise<BookmarkResponse[]> {
-    const rows = await db.select({
+    let whereClause = eq(bookmarks.userId, userId);
+    
+    if (options?.tag) {
+      // Subquery to find bookmarks with this tag
+      const tagSubquery = db.select({ bookmarkId: bookmarkTags.bookmarkId })
+        .from(bookmarkTags)
+        .innerJoin(tags, eq(bookmarkTags.tagId, tags.id))
+        .where(and(eq(tags.userId, userId), eq(tags.name, options.tag)));
+      
+      // Since we can't easily use inArray with a dynamic query here without extra complexity,
+      // we'll stick to basic filtering for now but fix the search logic.
+    }
+
+    const query = db.select({
       bookmark: bookmarks,
       tags: sql<Tag[]>`coalesce(
         json_agg(
@@ -42,17 +55,30 @@ export class DatabaseStorage implements IStorage {
     .from(bookmarks)
     .leftJoin(bookmarkTags, eq(bookmarks.id, bookmarkTags.bookmarkId))
     .leftJoin(tags, eq(bookmarkTags.tagId, tags.id))
-    .where(eq(bookmarks.userId, userId))
+    .where(whereClause)
     .groupBy(bookmarks.id)
     .orderBy(desc(bookmarks.createdAt));
 
+    const rows = await query;
+    let filteredRows = rows.map(row => ({ ...row.bookmark, tags: row.tags }));
+
     if (options?.search) {
-      // Re-apply where with search if needed, but grouping makes it complex for conditional where.
-      // Keeping it simple for now as search is less critical than correctness.
+      const searchLower = options.search.toLowerCase();
+      filteredRows = filteredRows.filter(b => 
+        (b.title?.toLowerCase().includes(searchLower)) ||
+        (b.url.toLowerCase().includes(searchLower)) ||
+        (b.note?.toLowerCase().includes(searchLower)) ||
+        (b.tags.some(t => t.name.toLowerCase().includes(searchLower)))
+      );
     }
 
-    const res = await rows;
-    return res.map(row => ({ ...row.bookmark, tags: row.tags }));
+    if (options?.tag) {
+      filteredRows = filteredRows.filter(b => 
+        b.tags.some(t => t.name === options.tag)
+      );
+    }
+
+    return filteredRows;
   }
 
   async getPublicBookmarks(): Promise<BookmarkResponse[]> {
