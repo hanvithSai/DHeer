@@ -60,7 +60,8 @@ export const bookmarkTagsRelations = relations(bookmarkTags, ({ one }) => ({
 export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({ 
   id: true, 
   createdAt: true, 
-  updatedAt: true 
+  updatedAt: true,
+  userId: true 
 });
 
 export const insertTagSchema = createInsertSchema(tags).omit({ id: true });
