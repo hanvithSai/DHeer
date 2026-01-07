@@ -108,6 +108,31 @@ export async function registerRoutes(
      res.json(tags);
   });
 
+  app.patch(api.tags.update.path, requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const { name } = api.tags.update.input.parse(req.body);
+      const tag = await storage.updateTag(userId, Number(req.params.id), name);
+      res.json(tag);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(404).json({ message: "Tag not found" });
+      }
+    }
+  });
+
+  app.delete(api.tags.delete.path, requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      await storage.deleteTag(userId, Number(req.params.id));
+      res.status(204).end();
+    } catch (err) {
+      res.status(404).json({ message: "Tag not found" });
+    }
+  });
+
   // === Public API ===
   app.get(api.public.list.path, async (req, res) => {
     const bookmarks = await storage.getPublicBookmarks();

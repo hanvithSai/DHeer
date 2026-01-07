@@ -61,11 +61,19 @@ export function BookmarkCard({ bookmark, index }: BookmarkCardProps) {
                   {bookmark.title || bookmark.url}
                 </h3>
               </a>
-              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 hover:text-foreground transition-colors">
-                  <ExternalLink className="w-3 h-3" />
-                  {getDomain(bookmark.url)}
-                </span>
+              <a 
+                href={bookmark.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-foreground transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(bookmark.url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <ExternalLink className="w-3 h-3" />
+                {getDomain(bookmark.url)}
+              </a>
                 <span>•</span>
                 <span className="font-mono">{format(new Date(bookmark.createdAt || new Date()), 'MMM d, yyyy')}</span>
                 {bookmark.isPublic && (

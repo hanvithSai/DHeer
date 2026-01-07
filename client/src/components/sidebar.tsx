@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { motion } from 'framer-motion';
-import { Hash, Home, Star, Tag, LogOut, Loader2, Globe } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Hash, Home, Star, Tag, LogOut, Loader2, Globe, MoreVertical, Edit2, Trash2, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
-import { useTags } from '@/hooks/use-tags';
+import { useTags, useUpdateTag, useDeleteTag } from '@/hooks/use-tags';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import icon32 from '@assets/icon32_1767721345186.png';
 
 interface SidebarProps {
@@ -17,6 +24,10 @@ export function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
   const { data: tags, isLoading: isLoadingTags } = useTags();
+  const updateTag = useUpdateTag();
+  const deleteTag = useDeleteTag();
+  const [editingTagId, setEditingTagId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
 
   // Get search param 'tag'
   const params = new URLSearchParams(window.location.search);
@@ -81,19 +92,88 @@ export function Sidebar({ className }: SidebarProps) {
               </div>
             ) : tags && tags.length > 0 ? (
               tags.map((tag) => (
-                <Link key={tag.id} href={`/?tag=${tag.name}`}>
-                  <div
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm transition-colors cursor-pointer group",
-                      currentTag === tag.name 
-                        ? "text-primary bg-primary/5" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                    )}
-                  >
-                    <Hash className="w-3 h-3 opacity-50 group-hover:opacity-100" />
-                    <span className="truncate">{tag.name}</span>
-                  </div>
-                </Link>
+                <div key={tag.id} className="relative group">
+                  {editingTagId === tag.id ? (
+                    <div className="flex items-center gap-1 px-2 py-1">
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="h-7 text-xs bg-white/5 border-white/10"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            updateTag.mutate({ id: tag.id, name: editName });
+                            setEditingTagId(null);
+                          } else if (e.key === 'Escape') {
+                            setEditingTagId(null);
+                          }
+                        }}
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-green-500 hover:bg-green-500/10"
+                        onClick={() => {
+                          updateTag.mutate({ id: tag.id, name: editName });
+                          setEditingTagId(null);
+                        }}
+                      >
+                        <Check className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-red-500 hover:bg-red-500/10"
+                        onClick={() => setEditingTagId(null)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center group/item">
+                      <Link href={`/?tag=${tag.name}`} className="flex-1">
+                        <div
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm transition-colors cursor-pointer group",
+                            currentTag === tag.name 
+                              ? "text-primary bg-primary/5" 
+                              : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                          )}
+                        >
+                          <Hash className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                          <span className="truncate">{tag.name}</span>
+                        </div>
+                      </Link>
+                      
+                      <div className="absolute right-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-white">
+                              <MoreVertical className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-32 bg-card border-white/10">
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                setEditingTagId(tag.id);
+                                setEditName(tag.name);
+                              }}
+                              className="text-xs flex items-center gap-2 hover:bg-white/5 cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3" /> Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => deleteTag.mutate(tag.id)}
+                              className="text-xs flex items-center gap-2 text-destructive hover:bg-destructive/10 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))
             ) : (
               <div className="px-3 py-2 text-sm text-muted-foreground italic opacity-50">

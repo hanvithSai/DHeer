@@ -24,6 +24,8 @@ export interface IStorage {
   
   // Tag methods
   getTags(userId: string): Promise<Tag[]>;
+  updateTag(userId: string, id: number, name: string): Promise<Tag>;
+  deleteTag(userId: string, id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -185,6 +187,24 @@ export class DatabaseStorage implements IStorage {
 
   async getTags(userId: string): Promise<Tag[]> {
     return await db.select().from(tags).where(eq(tags.userId, userId));
+  }
+
+  async updateTag(userId: string, id: number, name: string): Promise<Tag> {
+    const [updated] = await db.update(tags)
+      .set({ name })
+      .where(and(eq(tags.id, id), eq(tags.userId, userId)))
+      .returning();
+    if (!updated) throw new Error("Tag not found");
+    return updated;
+  }
+
+  async deleteTag(userId: string, id: number): Promise<void> {
+    // Also remove associations
+    await db.delete(bookmarkTags).where(eq(bookmarkTags.tagId, id));
+    const [deleted] = await db.delete(tags)
+      .where(and(eq(tags.id, id), eq(tags.userId, userId)))
+      .returning();
+    if (!deleted) throw new Error("Tag not found");
   }
 }
 

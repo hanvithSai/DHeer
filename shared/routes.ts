@@ -80,6 +80,26 @@ export const api = {
         200: z.array(z.custom<typeof tags.$inferSelect>()),
         401: errorSchemas.unauthorized
       }
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/tags/:id',
+      input: z.object({ name: z.string().min(1) }),
+      responses: {
+        200: z.custom<typeof tags.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+        401: errorSchemas.unauthorized
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/tags/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+        401: errorSchemas.unauthorized
+      },
     }
   },
   public: {
