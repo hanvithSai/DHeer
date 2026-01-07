@@ -39,7 +39,7 @@ export function Sidebar({ className }: SidebarProps) {
   ];
 
   return (
-    <div className={cn("flex flex-col h-full bg-card border-r border-border", className)}>
+    <div className={cn("flex flex-col h-full bg-card border-r border-border md:w-64", className)}>
       <div className="p-6">
         <div className="flex items-center gap-3">
           <img src={icon32} alt="Logo" className="w-8 h-8 rounded-lg shadow-lg shadow-primary/20" />

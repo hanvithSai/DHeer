@@ -86,7 +86,6 @@ export function BookmarkCard({ bookmark, index }: BookmarkCardProps) {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-              </div>
             </div>
             <div className={cn(
               "flex gap-1 transition-opacity duration-200",
