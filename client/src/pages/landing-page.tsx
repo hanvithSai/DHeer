@@ -21,8 +21,8 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src={icon128} alt="MMarkit Logo" className="w-10 h-10 drop-shadow-lg" />
-          <span className="font-display font-bold text-2xl tracking-tight">MMarkit</span>
+          <img src={icon128} alt="DHeer Logo" className="w-10 h-10 drop-shadow-lg" />
+          <span className="font-display font-bold text-2xl tracking-tight">DHeer</span>
         </div>
         <div className="flex gap-4">
           <Button variant="ghost" className="hidden sm:flex" onClick={() => window.location.href = '/public'}>
@@ -113,7 +113,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 py-8 text-center text-sm text-muted-foreground border-t border-white/5 bg-black/20">
-        <p>© 2024 MMarkit. Built with precision and care.</p>
+        <p>© 2024 DHeer. Built with precision and care.</p>
       </footer>
     </div>
   );

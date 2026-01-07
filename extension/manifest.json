@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "MMarkit - Bookmark Manager",
+  "name": "DHeer - Bookmark Manager",
   "version": "1.0.0",
-  "description": "A simple, modern bookmark manager that syncs with MMarkit web app.",
+  "description": "A simple, modern bookmark manager that syncs with DHeer web app.",
   "permissions": [
     "sidePanel",
     "activeTab",
@@ -13,7 +13,7 @@
     "*://*/*"
   ],
   "action": {
-    "default_title": "Open MMarkit Side Panel",
+    "default_title": "Open DHeer Side Panel",
     "default_icon": {
       "16": "assets/icon16_1767721345187.png",
       "32": "assets/icon32_1767721345186.png",
