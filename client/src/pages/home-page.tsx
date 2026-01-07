@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import { BookmarkCard } from '@/components/bookmark-card';
@@ -12,15 +12,22 @@ import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [location] = useLocation();
   
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // Parse query params
   const params = new URLSearchParams(window.location.search);
   const tag = params.get('tag') || undefined;
   
-  // Use debounced search ideally, but for now direct binding
   const { data: bookmarks, isLoading, isError } = useBookmarks({ 
-    search: search || undefined, 
+    search: debouncedSearch || undefined, 
     tag 
   });
 

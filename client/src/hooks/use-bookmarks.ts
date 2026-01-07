@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type CreateBookmarkRequest, type UpdateBookmarkRequest } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
+import { type CreateBookmarkRequest, type UpdateBookmarkRequest } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export function useBookmarks(params?: { search?: string; tag?: string }) {
