@@ -33,7 +33,7 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="flex items-center gap-3">
           <img src={icon32} alt="Logo" className="w-8 h-8 rounded-lg shadow-lg shadow-primary/20" />
           <h1 className="text-xl font-display font-bold tracking-tight text-white">
-            MMarkit
+           DHeer
           </h1>
         </div>
       </div>
