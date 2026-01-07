@@ -115,87 +115,89 @@ export function AddBookmarkDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="sm:max-w-[500px] border-white/10 bg-[#161616] text-white shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-display">
-            {mode === 'create' ? 'Add New Bookmark' : 'Edit Bookmark'}
-          </DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-2">
-          <div className="space-y-2">
-            <Label htmlFor="url">URL</Label>
-            <Input 
-              id="url" 
-              placeholder="https://example.com" 
-              className="bg-black/20 border-white/10 focus:border-primary/50"
-              {...register('url')}
-            />
-            {errors.url && <p className="text-xs text-destructive">{errors.url.message}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input 
-              id="title" 
-              placeholder="Page title" 
-              className="bg-black/20 border-white/10 focus:border-primary/50"
-              {...register('title')}
-            />
-            {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tags">Tags (comma separated)</Label>
-            <Input 
-              id="tags" 
-              placeholder="design, tutorial, reference" 
-              className="bg-black/20 border-white/10 focus:border-primary/50 font-mono text-sm"
-              {...register('tags')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="note">Notes</Label>
-            <Textarea 
-              id="note" 
-              placeholder="Why is this interesting?" 
-              className="bg-black/20 border-white/10 focus:border-primary/50 min-h-[100px] resize-none"
-              {...register('note')}
-            />
-          </div>
-
-          <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/5 border border-white/5">
-            <div className="space-y-0.5">
-              <Label htmlFor="public-mode" className="text-base">Public Bookmark</Label>
-              <p className="text-xs text-muted-foreground">Everyone can see this bookmark</p>
+      <DialogContent className="w-[95vw] sm:max-w-[500px] max-h-[95vh] overflow-y-auto border-white/10 bg-[#161616] text-white shadow-2xl p-0">
+        <div className="p-6 space-y-5">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display">
+              {mode === 'create' ? 'Add New Bookmark' : 'Edit Bookmark'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="url">URL</Label>
+              <Input 
+                id="url" 
+                placeholder="https://example.com" 
+                className="bg-black/20 border-white/10 focus:border-primary/50"
+                {...register('url')}
+              />
+              {errors.url && <p className="text-xs text-destructive">{errors.url.message}</p>}
             </div>
-            <Switch 
-              id="public-mode" 
-              onCheckedChange={(checked) => setValue('isPublic', checked)}
-              defaultChecked={initialData?.isPublic || false}
-            />
-          </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
-              Cancel
-            </Button>
-            <ShinyButton type="submit" disabled={isPending}>
-              {isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  {mode === 'create' ? <Plus className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                  {mode === 'create' ? 'Add Bookmark' : 'Save Changes'}
-                </>
-              )}
-            </ShinyButton>
-          </DialogFooter>
-        </form>
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input 
+                id="title" 
+                placeholder="Page title" 
+                className="bg-black/20 border-white/10 focus:border-primary/50"
+                {...register('title')}
+              />
+              {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tags">Tags (comma separated)</Label>
+              <Input 
+                id="tags" 
+                placeholder="design, tutorial, reference" 
+                className="bg-black/20 border-white/10 focus:border-primary/50 font-mono text-sm"
+                {...register('tags')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="note">Notes</Label>
+              <Textarea 
+                id="note" 
+                placeholder="Why is this interesting?" 
+                className="bg-black/20 border-white/10 focus:border-primary/50 min-h-[100px] resize-none"
+                {...register('note')}
+              />
+            </div>
+
+            <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/5 border border-white/5">
+              <div className="space-y-0.5">
+                <Label htmlFor="public-mode" className="text-base">Public Bookmark</Label>
+                <p className="text-xs text-muted-foreground">Everyone can see this bookmark</p>
+              </div>
+              <Switch 
+                id="public-mode" 
+                onCheckedChange={(checked) => setValue('isPublic', checked)}
+                defaultChecked={initialData?.isPublic || false}
+              />
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <ShinyButton type="submit" disabled={isPending} className="w-full sm:w-auto">
+                {isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    {mode === 'create' ? <Plus className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                    {mode === 'create' ? 'Add Bookmark' : 'Save Changes'}
+                  </>
+                )}
+              </ShinyButton>
+            </DialogFooter>
+          </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

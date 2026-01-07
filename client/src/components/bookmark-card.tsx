@@ -25,7 +25,6 @@ export function BookmarkCard({ bookmark, index }: BookmarkCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // Helper to extract domain from URL
   const getDomain = (url: string) => {
     try {
       return new URL(url).hostname.replace('www.', '');
@@ -61,19 +60,19 @@ export function BookmarkCard({ bookmark, index }: BookmarkCardProps) {
                   {bookmark.title || bookmark.url}
                 </h3>
               </a>
-              <a 
-                href={bookmark.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 hover:text-foreground transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(bookmark.url, '_blank', 'noopener,noreferrer');
-                }}
-              >
-                <ExternalLink className="w-3 h-3" />
-                {getDomain(bookmark.url)}
-              </a>
+              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                <a 
+                  href={bookmark.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {getDomain(bookmark.url)}
+                </a>
                 <span>•</span>
                 <span className="font-mono">{format(new Date(bookmark.createdAt || new Date()), 'MMM d, yyyy')}</span>
                 {bookmark.isPublic && (
@@ -86,9 +85,10 @@ export function BookmarkCard({ bookmark, index }: BookmarkCardProps) {
                     </Tooltip>
                   </TooltipProvider>
                 )}
+              </div>
             </div>
             <div className={cn(
-              "flex gap-1 transition-opacity duration-200",
+              "flex gap-1 transition-opacity duration-200 shrink-0",
               isHovered ? "opacity-100" : "opacity-0"
             )}>
               <Button
@@ -130,7 +130,7 @@ export function BookmarkCard({ bookmark, index }: BookmarkCardProps) {
               </Badge>
             ))
           ) : (
-            <div className="h-6"></div> /* Spacer to keep consistent height */
+            <div className="h-6"></div>
           )}
         </div>
       </motion.div>
