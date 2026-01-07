@@ -8,7 +8,6 @@ export function useBookmarks(params?: { search?: string; tag?: string }) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      // Build query string manually or use URLSearchParams because api path doesn't include query params
       const url = new URL(api.bookmarks.list.path, window.location.origin);
       if (params?.search) url.searchParams.append("search", params.search);
       if (params?.tag) url.searchParams.append("tag", params.tag);
