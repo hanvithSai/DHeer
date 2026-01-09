@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Setup listeners
   saveBtn.addEventListener('click', saveBookmark);
-  loginLink.addEventListener('click', () => {
+  loginLink.addEventListener('click', (e) => {
+    e.preventDefault();
     chrome.tabs.create({ url: `${API_BASE_URL}/` });
   });
 });
@@ -40,7 +41,7 @@ async function checkAuth() {
     if (res.ok) {
       const user = await res.json();
       if (userDisplay) {
-        userDisplay.innerText = `Logged in as: ${user.firstName || user.email}`;
+        userDisplay.innerText = `${user.firstName || user.email}`;
       }
       authCheck.classList.add('hidden');
       mainContent.classList.remove('hidden');
@@ -50,8 +51,7 @@ async function checkAuth() {
     }
   } catch (err) {
     console.error("Auth check failed", err);
-    statusMsg.innerText = "Could not connect to server.";
-    statusMsg.style.color = "red";
+    showLogin(); // Fallback to login on error
   }
 }
 
@@ -62,6 +62,7 @@ function showLogin() {
 
 async function saveBookmark() {
   saveBtn.disabled = true;
+  const originalBtnText = saveBtn.innerText;
   saveBtn.innerText = "Saving...";
   statusMsg.innerText = "";
 
@@ -82,11 +83,16 @@ async function saveBookmark() {
     });
 
     if (res.ok) {
-      statusMsg.innerText = "Saved!";
-      statusMsg.style.color = "#9C64FB";
+      statusMsg.innerText = "✓ Saved Successfully";
+      statusMsg.style.color = "#10b981";
+      
+      // Reset form but keep URL if user wants to add multiple things (though rare)
+      tagsInput.value = '';
+      noteInput.value = '';
+      
       setTimeout(() => {
         statusMsg.innerText = "";
-        saveBtn.innerText = "Save Bookmark";
+        saveBtn.innerText = originalBtnText;
         saveBtn.disabled = false;
       }, 2000);
       loadRecentBookmarks();
@@ -95,9 +101,9 @@ async function saveBookmark() {
       throw new Error(err.message || "Failed to save");
     }
   } catch (error) {
-    statusMsg.innerText = error.message;
-    statusMsg.style.color = "red";
-    saveBtn.innerText = "Save Bookmark";
+    statusMsg.innerText = "✕ " + error.message;
+    statusMsg.style.color = "#ef4444";
+    saveBtn.innerText = originalBtnText;
     saveBtn.disabled = false;
   }
 }
@@ -117,23 +123,29 @@ async function loadRecentBookmarks() {
 function renderRecent(bookmarks) {
   recentList.innerHTML = '';
   if (bookmarks.length === 0) {
-    recentList.innerHTML = '<div style="color:#666; font-style:italic;">No bookmarks yet</div>';
+    recentList.innerHTML = '<div class="empty-state">No bookmarks yet</div>';
     return;
   }
   
   bookmarks.forEach(b => {
     const div = document.createElement('div');
-    div.style.padding = '8px';
-    div.style.background = '#222';
-    div.style.borderRadius = '4px';
+    div.className = 'recent-item';
+    
+    let hostname = '';
+    try {
+      hostname = new URL(b.url).hostname;
+    } catch (e) {
+      hostname = b.url;
+    }
+
     div.innerHTML = `
-      <div style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${b.title || b.url}</div>
-      <div style="font-size:11px; color:#888;">${new URL(b.url).hostname}</div>
+      <div class="recent-title">${b.title || b.url}</div>
+      <div class="recent-url">${hostname}</div>
     `;
+    
     div.addEventListener('click', () => {
        chrome.tabs.create({ url: b.url });
     });
-    div.style.cursor = 'pointer';
     recentList.appendChild(div);
   });
 }
