@@ -156,12 +156,12 @@ export default function LandingPage() {
                    repeat: Infinity,
                    ease: "easeInOut"
                  }}
-                 className="w-24 h-24 bg-primary/20 rounded-full mx-auto flex items-center justify-center shadow-[0_0_40px_rgba(156,100,251,0.2)]"
+                 className="w-24 h-24 bg-primary/20 rounded-full mx-auto flex items-center justify-center shadow-[0_0_40px_rgba(137,87,55,0.2)]"
                >
-                 <Heart className="w-12 h-12 text-primary" />
+                 <span className="text-4xl">🦌</span>
                </motion.div>
-               <p className="text-sm font-medium text-primary uppercase tracking-widest">Active Companion</p>
-               <h3 className="text-2xl font-bold italic">"You've been on this page for 20 mins... <br/> Go take a walk, friend!"</h3>
+               <p className="text-sm font-medium text-primary uppercase tracking-widest">Dheer Mascot</p>
+               <h3 className="text-2xl font-bold italic">"I'm keeping an eye on your tabs... <br/> Let's stay productive!"</h3>
              </div>
           </motion.div>
         </section>
