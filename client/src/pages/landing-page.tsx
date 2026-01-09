@@ -38,50 +38,78 @@ export default function LandingPage() {
       <main className="relative z-10 flex-1 flex flex-col items-center">
         <section className="px-4 py-20 text-center max-w-4xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
             className="space-y-8"
           >
-            <div className="inline-flex items-center px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="inline-flex items-center px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-4"
+            >
               <Heart className="w-3 h-3 mr-2 fill-primary" />
               Inspired by Deer — Your Virtual Companion
-            </div>
+            </motion.div>
             
             <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight leading-[1.1]">
-              A companion that <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-400 to-blue-500 animate-gradient bg-[length:200%_auto]">
+              <motion.span
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3, duration: 0.6 }}
+                className="block"
+              >
+                A companion that
+              </motion.span>
+              <motion.span
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+                className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-400 to-blue-500 animate-gradient bg-[length:200%_auto]"
+              >
                 browses with you.
-              </span>
+              </motion.span>
             </h1>
             
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7, duration: 0.8 }}
+              className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
+            >
               DHeer isn't just a bookmark manager. It's a virtual companion that lives in your browser, 
               remembers your journey, and keeps you productive with a touch of personality.
-            </p>
+            </motion.p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-              <ShinyButton className="h-12 px-8 text-lg" onClick={handleLogin}>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9, duration: 0.6 }}
+              className="flex flex-col sm:flex-row gap-4 justify-center mt-8"
+            >
+              <ShinyButton className="h-12 px-8 text-lg hover:scale-105 transition-transform" onClick={handleLogin}>
                 Start Your Journey
                 <ArrowRight className="w-5 h-5 ml-2" />
               </ShinyButton>
               <Button 
                 variant="secondary" 
-                className="h-12 px-8 text-lg bg-white/5 hover:bg-white/10 border border-white/10"
+                className="h-12 px-8 text-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:scale-105 transition-transform"
                 onClick={() => window.location.href = '/public'}
               >
                 Explore Community
               </Button>
-            </div>
+            </motion.div>
           </motion.div>
         </section>
 
         {/* Story Section */}
         <section className="w-full max-w-6xl mx-auto px-6 py-24 grid md:grid-cols-2 gap-16 items-center">
           <motion.div 
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
             className="space-y-6"
           >
             <h2 className="text-3xl font-bold font-display">More than just storage</h2>
@@ -90,31 +118,48 @@ export default function LandingPage() {
               Inspired by the concept of a "Deer" — a gentle, watchful companion — we built DHeer to be your browser's guardian.
             </p>
             <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <div className="mt-1 bg-primary/20 p-1 rounded-full"><Sparkles className="w-4 h-4 text-primary" /></div>
-                <span>Acts as a virtual companion that stays with you on every page.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="mt-1 bg-primary/20 p-1 rounded-full"><Brain className="w-4 h-4 text-primary" /></div>
-                <span>Remembers what you did and provides context when you need it.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="mt-1 bg-primary/20 p-1 rounded-full"><MessageCircle className="w-4 h-4 text-primary" /></div>
-                <span>Cracks jokes and mentions your browsing stats to keep things light.</span>
-              </li>
+              {[
+                { icon: Sparkles, text: "Acts as a virtual companion that stays with you on every page." },
+                { icon: Brain, text: "Remembers what you did and provides context when you need it." },
+                { icon: MessageCircle, text: "Cracks jokes and mentions your browsing stats to keep things light." }
+              ].map((item, i) => (
+                <motion.li 
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 + (i * 0.1), duration: 0.5 }}
+                  className="flex items-start gap-3"
+                >
+                  <div className="mt-1 bg-primary/20 p-1 rounded-full"><item.icon className="w-4 h-4 text-primary" /></div>
+                  <span>{item.text}</span>
+                </motion.li>
+              ))}
             </ul>
           </motion.div>
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
+            initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
+            whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, type: "spring", bounce: 0.4 }}
             className="bg-gradient-to-br from-primary/10 to-blue-500/10 border border-white/10 rounded-3xl p-8 aspect-square flex items-center justify-center relative overflow-hidden group"
           >
              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
              <div className="z-10 text-center space-y-4">
-               <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto flex items-center justify-center animate-pulse">
+               <motion.div 
+                 animate={{ 
+                   scale: [1, 1.1, 1],
+                   rotate: [0, 5, -5, 0]
+                 }}
+                 transition={{ 
+                   duration: 4, 
+                   repeat: Infinity,
+                   ease: "easeInOut"
+                 }}
+                 className="w-24 h-24 bg-primary/20 rounded-full mx-auto flex items-center justify-center shadow-[0_0_40px_rgba(156,100,251,0.2)]"
+               >
                  <Heart className="w-12 h-12 text-primary" />
-               </div>
+               </motion.div>
                <p className="text-sm font-medium text-primary uppercase tracking-widest">Active Companion</p>
                <h3 className="text-2xl font-bold italic">"You've been on this page for 20 mins... <br/> Go take a walk, friend!"</h3>
              </div>
