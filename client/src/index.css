@@ -5,34 +5,40 @@
 @tailwind utilities;
 
 :root {
-  /* Dark Mode Default Theme based on requirements */
-  --background: 0 0% 7%;      /* #111111 */
-  --foreground: 260 10% 98%;
+  /* Deer Brown Color Palette */
+  /* #5e3023 (94,48,35) - Darkest Brown */
+  /* #895737 (137,87,55) - Medium Brown */
+  /* #c08552 (192,133,82) - Light Brown */
+  /* #dab49d (218,180,157) - Beige/Tan */
+  /* #f3e9dc (243,233,220) - Off-white */
+
+  --background: 28 35% 8%;      /* Very dark brown/black */
+  --foreground: 33 45% 95%;     /* Off-white #f3e9dc */
   
-  --card: 0 0% 10%;
-  --card-foreground: 260 10% 98%;
+  --card: 28 35% 12%;           /* Slightly lighter dark brown */
+  --card-foreground: 33 45% 95%;
   
-  --popover: 0 0% 9%;
-  --popover-foreground: 260 10% 98%;
+  --popover: 28 35% 10%;
+  --popover-foreground: 33 45% 95%;
   
-  --primary: 262 95% 69%;     /* #9C64FB */
-  --primary-foreground: 0 0% 100%;
+  --primary: 33 45% 45%;        /* Medium Brown #895737 */
+  --primary-foreground: 33 45% 95%;
   
-  --secondary: 260 5% 15%;
-  --secondary-foreground: 260 10% 90%;
+  --secondary: 28 35% 15%;
+  --secondary-foreground: 33 45% 85%;
   
-  --muted: 260 5% 15%;
-  --muted-foreground: 260 5% 60%;
+  --muted: 28 35% 15%;
+  --muted-foreground: 33 15% 60%;
   
-  --accent: 262 95% 69%;
-  --accent-foreground: 0 0% 100%;
+  --accent: 33 45% 55%;         /* Light Brown #c08552 */
+  --accent-foreground: 33 45% 95%;
   
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
   
-  --border: 260 5% 18%;
-  --input: 260 5% 18%;
-  --ring: 262 95% 69%;
+  --border: 28 35% 20%;
+  --input: 28 35% 20%;
+  --ring: 33 45% 45%;
 
   --radius: 0.75rem;
   
