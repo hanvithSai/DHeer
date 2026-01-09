@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MMarkit Side Panel</title>
+  <title>DHeer Side Panel</title>
   <style>
     :root {
       --primary: #9C64FB;
@@ -84,23 +84,33 @@
       color: var(--primary);
       text-decoration: none;
     }
+    #user-display {
+      font-size: 11px;
+      color: #888;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
   <div class="container" id="app">
     <div id="auth-check" class="hidden auth-warning">
-      <p>Please log in to MMarkit to save bookmarks.</p>
-      <a href="#" id="login-link" class="auth-link">Open MMarkit Web App</a>
+      <p>Please log in to DHeer to save bookmarks.</p>
+      <a href="#" id="login-link" class="auth-link">Open DHeer Web App</a>
     </div>
 
     <div id="main-content">
-      <h2>Add Bookmark</h2>
-      <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <h2>Add Bookmark</h2>
+          <div id="user-display"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px;">
         <label for="title" style="display:block; margin-bottom:4px; font-size:12px; color:#aaa;">Title</label>
         <input type="text" id="title" placeholder="Page Title">
         
         <label for="url" style="display:block; margin-bottom:4px; font-size:12px; color:#aaa;">URL</label>
-        <input type="text" id="url" readonly style="color:#888;">
+        <input type="text" id="url" placeholder="https://...">
 
         <label for="tags" style="display:block; margin-bottom:4px; font-size:12px; color:#aaa;">Tags (comma separated)</label>
         <input type="text" id="tags" placeholder="tech, news, design">

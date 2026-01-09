@@ -1,14 +1,9 @@
 // sidepanel.js
 
-// Change this to your actual deployed URL or localhost for testing
-const API_BASE_URL = window.location.origin.includes('chrome-extension://') 
-  ? 'http://localhost:5000' // Development default, user will need to change this for prod
-  : window.location.origin;
-
-// State
-let currentTab = null;
+const API_BASE_URL = 'https://d-heer--hanvithsaia.replit.app';
 
 // Elements
+const userDisplay = document.getElementById('user-display');
 const titleInput = document.getElementById('title');
 const urlInput = document.getElementById('url');
 const tagsInput = document.getElementById('tags');
@@ -25,7 +20,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Get current tab info
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) {
-    currentTab = tab;
     titleInput.value = tab.title || '';
     urlInput.value = tab.url || '';
   }
@@ -42,11 +36,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkAuth() {
   try {
-    // Note: Cross-origin cookies must be enabled for this to work in dev
-    // For production, we might need a more robust auth flow for extensions (e.g. token based)
-    // But for this MVP we'll try to rely on the session cookie if SameSite allows or just prompt
-    const res = await fetch(`${API_BASE_URL}/api/auth/user`);
+    const res = await fetch(`${API_BASE_URL}/api/auth/user`, { credentials: 'include' });
     if (res.ok) {
+      const user = await res.json();
+      if (userDisplay) {
+        userDisplay.innerText = `Logged in as: ${user.firstName || user.email}`;
+      }
       authCheck.classList.add('hidden');
       mainContent.classList.remove('hidden');
       loadRecentBookmarks();
@@ -55,7 +50,6 @@ async function checkAuth() {
     }
   } catch (err) {
     console.error("Auth check failed", err);
-    // In extension context, fetch might fail if CORS not set up or server down
     statusMsg.innerText = "Could not connect to server.";
     statusMsg.style.color = "red";
   }
@@ -83,7 +77,8 @@ async function saveBookmark() {
     const res = await fetch(`${API_BASE_URL}/api/bookmarks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      credentials: 'include'
     });
 
     if (res.ok) {
@@ -109,7 +104,7 @@ async function saveBookmark() {
 
 async function loadRecentBookmarks() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/bookmarks`);
+    const res = await fetch(`${API_BASE_URL}/api/bookmarks`, { credentials: 'include' });
     if (res.ok) {
       const bookmarks = await res.json();
       renderRecent(bookmarks.slice(0, 5));
