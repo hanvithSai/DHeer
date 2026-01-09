@@ -43,6 +43,9 @@ async function checkAuth() {
       if (userDisplay) {
         userDisplay.innerText = `${user.firstName || user.email}`;
       }
+      // Ensure we hide auth check and show main content correctly
+      authCheck.style.display = 'none';
+      mainContent.style.display = 'block';
       authCheck.classList.add('hidden');
       mainContent.classList.remove('hidden');
       loadRecentBookmarks();
@@ -51,16 +54,20 @@ async function checkAuth() {
     }
   } catch (err) {
     console.error("Auth check failed", err);
-    showLogin(); // Fallback to login on error
+    showLogin();
   }
 }
 
 function showLogin() {
+  authCheck.style.display = 'flex';
+  mainContent.style.display = 'none';
   authCheck.classList.remove('hidden');
   mainContent.classList.add('hidden');
 }
 
 async function saveBookmark() {
+  if (saveBtn.disabled) return;
+  
   saveBtn.disabled = true;
   const originalBtnText = saveBtn.innerText;
   saveBtn.innerText = "Saving...";
@@ -86,7 +93,6 @@ async function saveBookmark() {
       statusMsg.innerText = "✓ Saved Successfully";
       statusMsg.style.color = "#10b981";
       
-      // Reset form but keep URL if user wants to add multiple things (though rare)
       tagsInput.value = '';
       noteInput.value = '';
       

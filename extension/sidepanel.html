@@ -142,7 +142,7 @@
     }
 
     .hidden {
-      display: none;
+      display: none !important;
     }
 
     #status-message {
@@ -178,6 +178,7 @@
       border-radius: 8px;
       font-weight: 600;
       width: 100%;
+      display: block;
     }
 
     .section-title {
@@ -237,13 +238,13 @@
 </head>
 <body>
   <div class="container" id="app">
-    <div id="auth-check" class="hidden auth-warning">
+    <div id="auth-check" class="auth-warning hidden">
       <div style="font-size: 40px; margin-bottom: 10px;">🔖</div>
       <p>Please log in to DHeer to save bookmarks.</p>
       <a href="#" id="login-link" class="auth-link">Open DHeer Web App</a>
     </div>
 
-    <div id="main-content">
+    <div id="main-content" class="hidden">
       <header>
         <h2>Add Bookmark</h2>
         <div id="user-display" class="user-info"></div>
