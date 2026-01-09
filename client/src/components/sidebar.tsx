@@ -201,7 +201,7 @@ export function Sidebar({ className }: SidebarProps) {
           </Avatar>
           <div className="flex-1 overflow-hidden">
             <p className="text-sm font-medium truncate text-white">
-              {user?.firstName} {user?.lastName}
+              {user?.firstName ?? ''} {user?.lastName ?? ''}
             </p>
             <p className="text-xs text-muted-foreground truncate">
               {user?.email}

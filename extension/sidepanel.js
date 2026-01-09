@@ -91,7 +91,7 @@ async function saveBookmark() {
 
     if (res.ok) {
       statusMsg.innerText = "✓ Saved Successfully";
-      statusMsg.style.color = "#10b981";
+      statusMsg.style.color = "#895737";
       
       tagsInput.value = '';
       noteInput.value = '';
