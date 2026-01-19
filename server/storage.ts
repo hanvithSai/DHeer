@@ -1,11 +1,15 @@
 import { db } from "./db";
 import { 
-  bookmarks, tags, bookmarkTags,
+  bookmarks, tags, bookmarkTags, workspaces, companionSettings,
   type CreateBookmarkRequest,
   type UpdateBookmarkRequest,
   type BookmarkResponse,
   type Tag,
-  type Bookmark
+  type Bookmark,
+  type Workspace,
+  type InsertWorkspace,
+  type CompanionSettings,
+  type InsertCompanionSettings
 } from "@shared/schema";
 import { eq, desc, and, ilike, sql, or } from "drizzle-orm";
 import { users, type User } from "@shared/models/auth";
@@ -21,6 +25,15 @@ export interface IStorage {
   getTags(userId: string): Promise<Tag[]>;
   updateTag(userId: string, id: number, name: string): Promise<Tag>;
   deleteTag(userId: string, id: number): Promise<void>;
+  
+  // Workspaces
+  getWorkspaces(userId: string): Promise<Workspace[]>;
+  createWorkspace(userId: string, workspace: InsertWorkspace): Promise<Workspace>;
+  deleteWorkspace(userId: string, id: number): Promise<void>;
+  
+  // Companion Settings
+  getCompanionSettings(userId: string): Promise<CompanionSettings>;
+  updateCompanionSettings(userId: string, updates: Partial<InsertCompanionSettings>): Promise<CompanionSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -32,17 +45,6 @@ export class DatabaseStorage implements IStorage {
   async getBookmarks(userId: string, options?: { search?: string, tag?: string }): Promise<BookmarkResponse[]> {
     let whereClause = eq(bookmarks.userId, userId);
     
-    if (options?.tag) {
-      // Subquery to find bookmarks with this tag
-      const tagSubquery = db.select({ bookmarkId: bookmarkTags.bookmarkId })
-        .from(bookmarkTags)
-        .innerJoin(tags, eq(bookmarkTags.tagId, tags.id))
-        .where(and(eq(tags.userId, userId), eq(tags.name, options.tag)));
-      
-      // Since we can't easily use inArray with a dynamic query here without extra complexity,
-      // we'll stick to basic filtering for now but fix the search logic.
-    }
-
     const query = db.select({
       bookmark: bookmarks,
       tags: sql<Tag[]>`coalesce(
@@ -178,6 +180,43 @@ export class DatabaseStorage implements IStorage {
     await db.delete(bookmarkTags).where(eq(bookmarkTags.tagId, id));
     const [deleted] = await db.delete(tags).where(and(eq(tags.id, id), eq(tags.userId, userId))).returning();
     if (!deleted) throw new Error("Tag not found");
+  }
+
+  // Workspaces implementation
+  async getWorkspaces(userId: string): Promise<Workspace[]> {
+    return await db.select().from(workspaces).where(eq(workspaces.userId, userId)).orderBy(desc(workspaces.createdAt));
+  }
+
+  async createWorkspace(userId: string, workspace: InsertWorkspace): Promise<Workspace> {
+    const [newWorkspace] = await db.insert(workspaces).values({ ...workspace, userId }).returning();
+    return newWorkspace;
+  }
+
+  async deleteWorkspace(userId: string, id: number): Promise<void> {
+    await db.delete(workspaces).where(and(eq(workspaces.id, id), eq(workspaces.userId, userId)));
+  }
+
+  // Companion Settings implementation
+  async getCompanionSettings(userId: string): Promise<CompanionSettings> {
+    const [settings] = await db.select().from(companionSettings).where(eq(companionSettings.userId, userId));
+    if (!settings) {
+      const [newSettings] = await db.insert(companionSettings).values({ userId }).returning();
+      return newSettings;
+    }
+    return settings;
+  }
+
+  async updateCompanionSettings(userId: string, updates: Partial<InsertCompanionSettings>): Promise<CompanionSettings> {
+    const [updated] = await db.update(companionSettings)
+      .set(updates)
+      .where(eq(companionSettings.userId, userId))
+      .returning();
+    
+    if (!updated) {
+       const [newSettings] = await db.insert(companionSettings).values({ ...updates, userId }).returning();
+       return newSettings;
+    }
+    return updated;
   }
 }
 

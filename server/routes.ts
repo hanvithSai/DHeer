@@ -139,6 +139,58 @@ export async function registerRoutes(
     res.json(bookmarks);
   });
 
+  // === Workspaces API ===
+  app.get("/api/workspaces", requireAuth, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    const workspaces = await storage.getWorkspaces(userId);
+    res.json(workspaces);
+  });
+
+  app.post("/api/workspaces", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const { insertWorkspaceSchema } = await import("@shared/schema");
+      const input = insertWorkspaceSchema.parse(req.body);
+      const workspace = await storage.createWorkspace(userId, input);
+      res.status(201).json(workspace);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    }
+  });
+
+  app.delete("/api/workspaces/:id", requireAuth, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    await storage.deleteWorkspace(userId, Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // === Companion Settings API ===
+  app.get("/api/companion/settings", requireAuth, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    const settings = await storage.getCompanionSettings(userId);
+    res.json(settings);
+  });
+
+  app.patch("/api/companion/settings", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const { insertCompanionSettingsSchema } = await import("@shared/schema");
+      const input = insertCompanionSettingsSchema.partial().parse(req.body);
+      const settings = await storage.updateCompanionSettings(userId, input);
+      res.json(settings);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    }
+  });
+
   await seedDatabase();
 
   return httpServer;
