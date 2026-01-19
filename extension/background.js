@@ -37,23 +37,34 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       const url = new URL(tab.url);
       const domain = url.hostname;
       sessionMetadata.domainFrequency[domain] = (sessionMetadata.domainFrequency[domain] || 0) + 1;
+      
+      // Update tab count on every completed update just in case
+      const tabs = await chrome.tabs.query({});
+      sessionMetadata.tabCount = tabs.length;
     } catch (e) {}
   }
 });
 
 // Listen for tab creation/removal
-chrome.tabs.onCreated.addListener(() => {
-  sessionMetadata.tabCount++;
+chrome.tabs.onCreated.addListener(async () => {
+  const tabs = await chrome.tabs.query({});
+  sessionMetadata.tabCount = tabs.length;
   checkTabOverload();
 });
 
-chrome.tabs.onRemoved.addListener(() => {
-  sessionMetadata.tabCount = Math.max(0, sessionMetadata.tabCount - 1);
+chrome.tabs.onRemoved.addListener(async () => {
+  const tabs = await chrome.tabs.query({});
+  sessionMetadata.tabCount = tabs.length;
 });
 
 // Listen for tab switching
 chrome.tabs.onActivated.addListener(() => {
   sessionMetadata.tabSwitches++;
+  // We can broadcast the update immediately to anyone listening
+  chrome.runtime.sendMessage({ 
+    type: 'SESSION_METADATA_UPDATE', 
+    data: sessionMetadata 
+  }).catch(() => {}); // Ignore error if no one is listening
 });
 
 // Idle detection
@@ -75,7 +86,7 @@ function checkTabOverload() {
 
 function sendNudge(message) {
   // Use a simple notification or send message to sidepanel
-  chrome.runtime.sendMessage({ type: 'COMPANION_NUDGE', message });
+  chrome.runtime.sendMessage({ type: 'COMPANION_NUDGE', message }).catch(() => {});
   
   // Optional: Chrome notification
   chrome.notifications.create({
@@ -96,6 +107,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.type === 'LAUNCH_WORKSPACE') {
     launchWorkspace(request.urls);
   }
+  return true; // Keep message channel open for async response
 });
 
 async function launchWorkspace(urls) {

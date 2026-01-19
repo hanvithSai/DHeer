@@ -39,13 +39,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('nav-companion').addEventListener('click', () => showSection('companion-section'));
 
   // Companion logic
+  const updateDisplay = (data) => {
+    if (data) {
+      const tabCountEl = document.getElementById('ext-tab-count');
+      const tabSwitchesEl = document.getElementById('ext-tab-switches');
+      if (tabCountEl) tabCountEl.innerText = data.tabCount || 0;
+      if (tabSwitchesEl) tabSwitchesEl.innerText = data.tabSwitches || 0;
+    }
+  };
+
   const fetchCompanionData = async () => {
     // Session metadata from background
     chrome.runtime.sendMessage({ type: 'GET_SESSION_METADATA' }, (data) => {
-      if (data) {
-        document.getElementById('ext-tab-count').innerText = data.tabCount || 0;
-        document.getElementById('ext-tab-switches').innerText = data.tabSwitches || 0;
-      }
+      updateDisplay(data);
     });
 
     // Workspaces from API
@@ -59,6 +65,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.error("Failed to load workspaces", err);
     }
   };
+
+  // Listen for real-time updates from background
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'SESSION_METADATA_UPDATE') {
+      updateDisplay(message.data);
+    }
+  });
 
   function renderWorkspaces(workspaces) {
     const list = document.getElementById('ext-workspaces-list');
