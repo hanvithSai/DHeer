@@ -1,0 +1,209 @@
+You are extending an existing, working Chrome Manifest V3 browser extension and web application called DHeer.
+
+DHeer is already a functional bookmark manager with shared authentication and API between the web app and the extension. It allows users to save bookmarks with notes and tags. The extension and app are already branded with a deer mascot, and visual references (images + color palette) have already been provided.
+
+Your task is to enhance DHeer into a virtual companion–driven productivity assistant, while strictly reusing the existing branding assets and color palette extracted from the provided deer images.
+Do not introduce new colors, themes, or visual styles.
+
+Core Constraints (Strict)
+
+Use only the provided deer mascot images and their derived color palette
+
+Do not introduce new color schemes or UI themes
+
+Manifest V3 compliant
+
+Privacy-first and user-consented tracking
+
+Lightweight, event-driven, and performant
+
+Non-intrusive companion behavior
+
+Virtual Companion Concept
+
+The deer mascot represents a calm, observant virtual companion that:
+
+Passively understands browsing behavior at a high level
+
+Provides gentle, contextual nudges
+
+Never feels invasive, controlling, or distracting
+
+This is not a monitoring or surveillance tool.
+
+Functional Enhancements
+1. Tab & Session Awareness (Metadata Only)
+
+Track browser-level metadata only, never page content or user input.
+
+Capabilities:
+
+Current number of open tabs
+
+List of open tabs (URL + title only)
+
+Number of tab switches per session
+
+Highest number of tabs opened in a session
+
+Most frequently opened domains (aggregated)
+
+Time spent on the same tab (idle detection)
+
+Use appropriate Chrome APIs:
+
+chrome.tabs
+
+chrome.windows
+
+chrome.idle
+
+chrome.storage
+
+All tracking must be:
+
+Transparent
+
+User-configurable
+
+Opt-in
+
+2. Behavioral Insights (Local-First)
+
+Generate lightweight insights such as:
+
+Tab overload patterns
+
+Commonly revisited sites
+
+Session intensity (tab switching frequency)
+
+Idle-heavy sessions
+
+Defaults:
+
+Stored locally
+
+Aggregated only
+
+No raw history timelines
+
+Optional:
+
+Sync summarized metrics to the web app if explicitly enabled
+
+3. Companion Interactions & Nudges
+
+The deer companion reacts softly to context:
+
+Examples:
+
+Idle on a single tab for too long → small motivational pop message
+
+Excessive tab count → gentle reminder
+
+Closing a focused session → positive reinforcement
+
+Rules:
+
+No modal interruptions
+
+No frequent notifications
+
+Cooldowns between nudges
+
+Fully configurable or disableable
+
+Tone:
+
+Calm
+
+Encouraging
+
+Observational, not judgmental
+
+4. One-Click Workspace / Setup Mode
+
+Introduce configurable workspace setups:
+
+A setup opens a predefined set of websites
+
+Example: Gmail + Calendar + Docs
+
+Single-click execution
+
+Opens in new window or tab group
+
+Users can:
+
+Create
+
+Edit
+
+Delete
+
+Trigger setups manually
+
+5. Settings & User Control
+
+Expose clear controls for:
+
+Enabling/disabling tracking features
+
+Idle time thresholds
+
+Tab count thresholds
+
+Companion interaction frequency
+
+Workspace management
+
+Settings should be accessible from:
+
+Extension side panel
+
+Web app (shared schema)
+
+UX & Interaction Guidelines
+
+Follow the existing DHeer visual language
+
+Use the deer mascot for contextual feedback
+
+Keep animations subtle and purposeful
+
+Side panel remains the primary interaction surface
+
+Notifications should feel like whispers, not alerts
+
+Technical Expectations
+
+Event-driven architecture (no constant polling)
+
+Efficient background service worker usage
+
+Clear separation of concerns:
+
+Tracking logic
+
+Insight generation
+
+Companion behavior
+
+UI rendering
+
+Minimal memory footprint
+
+Deliverables
+
+Updated extension architecture plan
+
+Companion behavior model (triggers, states, cooldowns)
+
+Tracking modules (tab/session/idle)
+
+Workspace feature design
+
+Settings schema
+
+Privacy and Chrome policy compliance notes
