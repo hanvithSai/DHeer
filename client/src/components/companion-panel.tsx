@@ -42,8 +42,9 @@ export function CompanionPanel() {
 
   const launchWorkspace = (urls: string[]) => {
     // In extension context, we send message to background
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-      chrome.runtime.sendMessage({ type: 'LAUNCH_WORKSPACE', urls });
+    const chromeObj = (window as any).chrome;
+    if (chromeObj && chromeObj.runtime) {
+      chromeObj.runtime.sendMessage({ type: 'LAUNCH_WORKSPACE', urls });
     } else {
       urls.forEach(url => window.open(url, '_blank'));
     }
