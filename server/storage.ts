@@ -213,7 +213,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     if (!updated) {
-       const [newSettings] = await db.insert(companionSettings).values({ ...updates, userId }).returning();
+       const [newSettings] = await db.insert(companionSettings).values({ ...updates, userId } as any).returning();
        return newSettings;
     }
     return updated;
