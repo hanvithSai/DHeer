@@ -26,6 +26,69 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Check auth status
   checkAuth();
+  
+  // Show/Hide sections
+  const showSection = (sectionId) => {
+    ['bookmark-section', 'companion-section'].forEach(id => {
+      document.getElementById(id).classList.add('hidden');
+    });
+    document.getElementById(sectionId).classList.remove('hidden');
+  };
+
+  document.getElementById('nav-bookmark').addEventListener('click', () => showSection('bookmark-section'));
+  document.getElementById('nav-companion').addEventListener('click', () => showSection('companion-section'));
+
+  // Companion logic
+  const fetchCompanionData = async () => {
+    // Session metadata from background
+    chrome.runtime.sendMessage({ type: 'GET_SESSION_METADATA' }, (data) => {
+      if (data) {
+        document.getElementById('ext-tab-count').innerText = data.tabCount || 0;
+        document.getElementById('ext-tab-switches').innerText = data.tabSwitches || 0;
+      }
+    });
+
+    // Workspaces from API
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/workspaces`, { credentials: 'include' });
+      if (res.ok) {
+        const workspaces = await res.json();
+        renderWorkspaces(workspaces);
+      }
+    } catch (err) {
+      console.error("Failed to load workspaces", err);
+    }
+  };
+
+  function renderWorkspaces(workspaces) {
+    const list = document.getElementById('ext-workspaces-list');
+    list.innerHTML = '';
+    if (workspaces.length === 0) {
+      list.innerHTML = '<div class="text-[10px] text-[#895737] italic text-center p-4 bg-[#2a1f1b] rounded-xl">No workspaces found</div>';
+      return;
+    }
+
+    workspaces.forEach(ws => {
+      const div = document.createElement('div');
+      div.className = 'bg-[#2a1f1b] p-4 rounded-xl flex items-center justify-between group hover:border-[#c08552] border border-transparent transition-all cursor-pointer';
+      div.innerHTML = `
+        <div>
+          <div class="text-sm font-bold text-[#f3e9dc]">${ws.name}</div>
+          <div class="text-[8px] text-[#895737] uppercase tracking-widest">${ws.urls.length} Resources</div>
+        </div>
+        <div class="p-2 bg-[#c08552]/10 rounded-lg text-[#c08552]">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+      `;
+      div.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: 'LAUNCH_WORKSPACE', urls: ws.urls });
+      });
+      list.appendChild(div);
+    });
+  }
+
+  setInterval(fetchCompanionData, 5000);
+  fetchCompanionData();
 
   // Setup listeners
   saveBtn.addEventListener('click', saveBookmark);

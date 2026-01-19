@@ -10,6 +10,8 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Workspace, CompanionSettings } from '@shared/schema';
 
+import { SheetTrigger } from "@/components/ui/sheet";
+
 export function CompanionPanel() {
   const { toast } = useToast();
   const [sessionData, setSessionData] = useState({ tabCount: 0, tabSwitches: 0 });
