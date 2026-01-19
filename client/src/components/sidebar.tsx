@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hash, Home, Star, Tag, LogOut, Loader2, Globe, MoreVertical, Edit2, Trash2, Check, X } from 'lucide-react';
+import { Hash, Home, Star, Tag, LogOut, Loader2, Globe, MoreVertical, Edit2, Trash2, Check, X, Layout, Shield } from 'lucide-react';
+import { CompanionPanel } from './companion-panel';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTags, useUpdateTag, useDeleteTag } from '@/hooks/use-tags';
@@ -42,10 +50,23 @@ export function Sidebar({ className }: SidebarProps) {
     <div className={cn("flex flex-col h-full bg-card border-r border-border md:w-64", className)}>
       <div className="p-6">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <img src={icon32} alt="Logo" className="w-8 h-8 rounded-lg shadow-lg shadow-primary/20" />
-            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-accent rounded-full border-2 border-card animate-pulse shadow-[0_0_10px_rgba(206,152,105,0.5)]" title="Dheer is watching!" />
-          </div>
+          <Sheet>
+            <SheetTrigger asChild>
+              <div className="relative cursor-pointer group hover-elevate">
+                <img src={icon32} alt="Logo" className="w-8 h-8 rounded-lg shadow-lg shadow-primary/20 transition-transform group-hover:scale-110" />
+                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-accent rounded-full border-2 border-card animate-pulse shadow-[0_0_10px_rgba(206,152,105,0.5)]" title="Dheer is watching!" />
+              </div>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 p-0 border-r border-white/5 bg-background">
+              <SheetHeader className="p-6 border-b border-white/5">
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center text-lg">🦌</div>
+                  DHeer Companion
+                </SheetTitle>
+              </SheetHeader>
+              <CompanionPanel />
+            </SheetContent>
+          </Sheet>
           <div className="flex flex-col">
             <h1 className="text-xl font-display font-bold tracking-tight text-white leading-tight">
              DHeer
@@ -197,7 +218,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className="p-4 border-t border-white/5 bg-black/20">
         <div className="flex items-center gap-3 mb-4">
           <Avatar className="h-9 w-9 border border-white/10">
-            <AvatarImage src={user?.profileImageUrl} />
+            <AvatarImage src={user?.profileImageUrl ?? undefined} />
             <AvatarFallback className="bg-primary/20 text-primary text-xs">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </AvatarFallback>

@@ -59,7 +59,7 @@ export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
 export const tagsRelations = relations(tags, ({ one, many }) => ({
   user: one(users, {
     fields: [tags.userId],
-    references: [tags.id],
+    references: [users.id],
   }),
   bookmarkTags: many(bookmarkTags),
 }));
