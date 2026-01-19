@@ -66,7 +66,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
-                className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-400 to-blue-500 animate-gradient bg-[length:200%_auto]"
+                className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary animate-gradient bg-[length:200%_auto]"
               >
                 browses with you.
               </motion.span>
@@ -142,7 +142,7 @@ export default function LandingPage() {
             whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, type: "spring", bounce: 0.4 }}
-            className="bg-gradient-to-br from-primary/10 to-blue-500/10 border border-white/10 rounded-3xl p-8 aspect-square flex items-center justify-center relative overflow-hidden group"
+            className="bg-gradient-to-br from-primary/10 to-accent/10 border border-white/10 rounded-3xl p-8 aspect-square flex items-center justify-center relative overflow-hidden group"
           >
              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
              <div className="z-10 text-center space-y-4">

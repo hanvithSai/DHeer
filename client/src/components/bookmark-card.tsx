@@ -79,7 +79,7 @@ export function BookmarkCard({ bookmark, index }: BookmarkCardProps) {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Globe className="w-3 h-3 text-blue-400 ml-1" />
+                        <Globe className="w-3 h-3 text-accent ml-1" />
                       </TooltipTrigger>
                       <TooltipContent>Public Bookmark</TooltipContent>
                     </Tooltip>

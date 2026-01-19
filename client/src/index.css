@@ -5,40 +5,43 @@
 @tailwind utilities;
 
 :root {
-  /* Deer Brown Color Palette */
-  /* #5e3023 (94,48,35) - Darkest Brown */
-  /* #895737 (137,87,55) - Medium Brown */
-  /* #c08552 (192,133,82) - Light Brown */
-  /* #dab49d (218,180,157) - Beige/Tan */
-  /* #f3e9dc (243,233,220) - Off-white */
+  /* Deer Brown Color Palette - Refined for High Visibility */
+  /* Palette Colors:
+     #5e3023 (Darkest Brown)
+     #895737 (Medium Brown)
+     #c08552 (Light Brown)
+     #dab49d (Beige/Tan)
+     #f3e9dc (Off-white)
+  */
 
-  --background: 28 35% 8%;      /* Very dark brown/black */
-  --foreground: 33 45% 95%;     /* Off-white #f3e9dc */
+  --background: 28 45% 6%;      /* Deeper dark brown for better contrast #140d0a */
+  --foreground: 33 45% 94%;     /* Off-white #f3e9dc for primary text */
   
-  --card: 28 35% 12%;           /* Slightly lighter dark brown */
-  --card-foreground: 33 45% 95%;
+  --card: 28 35% 10%;           /* Slightly lighter than background #1a1512 */
+  --card-foreground: 33 45% 94%;
+  --card-border: 28 35% 18%;
   
-  --popover: 28 35% 10%;
-  --popover-foreground: 33 45% 95%;
+  --popover: 28 35% 8%;
+  --popover-foreground: 33 45% 94%;
   
-  --primary: 33 45% 45%;        /* Medium Brown #895737 */
-  --primary-foreground: 33 45% 95%;
+  --primary: 33 55% 48%;        /* Boosted saturation Medium Brown #9e6440 */
+  --primary-foreground: 33 45% 98%;
   
-  --secondary: 28 35% 15%;
-  --secondary-foreground: 33 45% 85%;
+  --secondary: 28 35% 14%;
+  --secondary-foreground: 33 30% 88%;
   
-  --muted: 28 35% 15%;
-  --muted-foreground: 33 15% 60%;
+  --muted: 28 30% 14%;
+  --muted-foreground: 33 15% 65%;
   
-  --accent: 33 45% 55%;         /* Light Brown #c08552 */
-  --accent-foreground: 33 45% 95%;
+  --accent: 33 50% 58%;         /* Brightened Light Brown #ce9869 */
+  --accent-foreground: 28 45% 6%;
   
-  --destructive: 0 62.8% 30.6%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
   
-  --border: 28 35% 20%;
-  --input: 28 35% 20%;
-  --ring: 33 45% 45%;
+  --border: 28 35% 18%;
+  --input: 28 35% 18%;
+  --ring: 33 55% 48%;
 
   --radius: 0.75rem;
   

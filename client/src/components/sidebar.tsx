@@ -44,13 +44,16 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="flex items-center gap-3">
           <div className="relative">
             <img src={icon32} alt="Logo" className="w-8 h-8 rounded-lg shadow-lg shadow-primary/20" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full border-2 border-card animate-bounce" title="Dheer is watching!" />
+            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-accent rounded-full border-2 border-card animate-pulse shadow-[0_0_10px_rgba(206,152,105,0.5)]" title="Dheer is watching!" />
           </div>
-          <div>
-            <h1 className="text-xl font-display font-bold tracking-tight text-white leading-none">
+          <div className="flex flex-col">
+            <h1 className="text-xl font-display font-bold tracking-tight text-white leading-tight">
              DHeer
             </h1>
-            <span className="text-[10px] text-accent font-medium uppercase tracking-tighter">Companion Active</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[10px] text-accent font-bold uppercase tracking-wider">Mascot Online</span>
+            </div>
           </div>
         </div>
       </div>
