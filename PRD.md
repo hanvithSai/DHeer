@@ -1,6 +1,6 @@
 # DHeer — Product Requirements Document
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** April 2026  
 **Status:** Living Document
 
@@ -333,7 +333,350 @@ All API routes live under the `/api/` prefix. Protected routes require an authen
 
 ---
 
-## 11. Future Considerations (Out of Scope for v1)
+## 11. Replit Platform Dependencies — Full Audit & Migration Guide
+
+This section catalogues every component that is tightly coupled to the Replit platform today, the risk it creates for portability, and a concrete, self-contained replacement for each one.
+
+---
+
+### 11.1 Dependency Map
+
+| # | Dependency | Type | Risk | Files Affected |
+|---|---|---|---|---|
+| D1 | Replit OpenID Connect (OIDC) auth | **Critical** | App cannot authenticate users anywhere else | `server/replit_integrations/auth/replitAuth.ts` |
+| D2 | `REPL_ID` environment variable | **Critical** | Used as the OIDC client ID; missing on any non-Replit host | `server/replit_integrations/auth/replitAuth.ts` |
+| D3 | `ISSUER_URL` environment variable | **Critical** | Hard-defaults to `https://replit.com/oidc` | `server/replit_integrations/auth/replitAuth.ts` |
+| D4 | Replit-provisioned PostgreSQL (`DATABASE_URL`) | **High** | DB is managed by Replit; not portable as-is | `server/db.ts`, `drizzle.config.ts` |
+| D5 | `SESSION_SECRET` environment variable | **Medium** | Must be re-created on any new host, but is generic | `server/replit_integrations/auth/replitAuth.ts` |
+| D6 | Hardcoded Replit app URL in extension | **High** | Extension always calls the Replit-hosted backend | `extension/sidepanel.js` line 3 |
+| D7 | `@replit/vite-plugin-runtime-error-modal` | **Low** | Dev-only error overlay; adds no production value | `vite.config.ts` |
+| D8 | `@replit/vite-plugin-cartographer` | **Low** | Replit-only dev tool; guarded by `REPL_ID` check | `vite.config.ts` |
+| D9 | `@replit/vite-plugin-dev-banner` | **Low** | Replit-only dev banner; guarded by `REPL_ID` check | `vite.config.ts` |
+| D10 | `shared/models/auth.ts` table comments | **Trivial** | Comments say "mandatory for Replit Auth"; code works fine without Replit | `shared/models/auth.ts` |
+
+---
+
+### 11.2 Detailed Analysis & Self-Contained Solutions
+
+---
+
+#### D1 — Replit OIDC Authentication (Critical)
+
+**What it does today:**  
+The entire login flow goes through Replit's OpenID Connect provider (`https://replit.com/oidc`). Passport.js uses `openid-client` configured against Replit's discovery endpoint. Users must have a Replit account.
+
+**Problem when migrating:**  
+Replit's OIDC server is not available outside Replit. No other host can serve as the identity provider, so every non-Replit deployment has zero working authentication.
+
+**Self-contained solution — Local email/password auth:**
+
+Replace `server/replit_integrations/auth/replitAuth.ts` with a local Passport.js `LocalStrategy`:
+
+```ts
+// server/auth/localAuth.ts
+import passport from "passport";
+import { Strategy as LocalStrategy } from "passport-local";
+import bcrypt from "bcryptjs";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import { db } from "../db";
+import { users } from "@shared/models/auth";
+import { eq } from "drizzle-orm";
+
+export function setupAuth(app) {
+  const PgStore = connectPg(session);
+  app.use(session({
+    secret: process.env.SESSION_SECRET!,
+    store: new PgStore({ conString: process.env.DATABASE_URL, tableName: "sessions" }),
+    resave: false,
+    saveUninitialized: false,
+    cookie: { httpOnly: true, secure: process.env.NODE_ENV === "production", maxAge: 7 * 24 * 60 * 60 * 1000 }
+  }));
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  passport.use(new LocalStrategy({ usernameField: "email" }, async (email, password, done) => {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    if (!user || !user.passwordHash) return done(null, false);
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    return valid ? done(null, user) : done(null, false);
+  }));
+
+  passport.serializeUser((user: any, cb) => cb(null, user.id));
+  passport.deserializeUser(async (id: string, cb) => {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    cb(null, user ?? false);
+  });
+
+  // Register: POST /api/register  { email, password, name }
+  // Login:    POST /api/login      { email, password }
+  // Logout:   GET  /api/logout
+}
+```
+
+Add `passwordHash varchar` to the `users` table in `shared/models/auth.ts`.  
+Add `bcryptjs` and `passport-local` to package dependencies.  
+Remove `openid-client` and `memoizee` from dependencies.
+
+**Alternative — Third-party OIDC (zero lock-in):**  
+Replace `ISSUER_URL` and `REPL_ID` with any standard OIDC provider:
+
+| Provider | `ISSUER_URL` | Notes |
+|---|---|---|
+| Auth0 | `https://<tenant>.auth0.com` | Free tier available |
+| Google | `https://accounts.google.com` | OAuth 2.0 OIDC-compatible |
+| Keycloak (self-hosted) | `https://your-host/realms/<realm>` | Fully self-hosted, no vendor lock |
+| Clerk | `https://<app>.clerk.accounts.dev` | Dev-friendly; has its own SDK |
+
+The existing `openid-client` code already supports any OIDC-compliant issuer. Only the two environment variables need changing — no code changes required for this path.
+
+---
+
+#### D2 & D3 — `REPL_ID` and `ISSUER_URL` Environment Variables (Critical)
+
+**What they do today:**
+- `REPL_ID` is passed as the OIDC `client_id` to Replit's auth server.
+- `ISSUER_URL` defaults to `https://replit.com/oidc` if not set.
+
+**Problem when migrating:**  
+`REPL_ID` only exists on Replit infrastructure. On any other host it is undefined, crashing the OIDC client setup.
+
+**Self-contained solution:**
+
+Rename these to generic variables and add validation:
+
+```ts
+// In auth setup, replace:
+process.env.REPL_ID!
+// With:
+process.env.OIDC_CLIENT_ID!
+
+// Replace the default:
+process.env.ISSUER_URL ?? "https://replit.com/oidc"
+// With:
+process.env.OIDC_ISSUER_URL   // No default — fail explicitly if missing
+```
+
+Required environment variables on any host:
+
+```env
+OIDC_ISSUER_URL=https://accounts.google.com   # or any OIDC provider
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret         # add if provider requires it
+SESSION_SECRET=any-random-32+-char-string
+DATABASE_URL=postgresql://user:pass@host/db
+```
+
+---
+
+#### D4 — Replit-Provisioned PostgreSQL (High)
+
+**What it does today:**  
+The database is provisioned automatically by Replit and injected as `DATABASE_URL`. The connection string points to Replit's internal Neon PostgreSQL cluster.
+
+**Problem when migrating:**  
+The Neon cluster is tied to the Replit account. On other hosts, `DATABASE_URL` is undefined and the app crashes on startup (`server/db.ts` throws on missing variable).
+
+**Self-contained solution:**
+
+The code itself (`server/db.ts`, Drizzle ORM) is already 100% portable — it only needs a valid PostgreSQL connection string. No code changes are required. The migration steps are:
+
+1. Export existing data: `pg_dump $DATABASE_URL > dheer_backup.sql`
+2. Provision a new PostgreSQL database on any of:
+   - **Supabase** (free tier, managed)
+   - **Railway** (simple deploy + DB combo)
+   - **Render** (Postgres + web service in one dashboard)
+   - **Neon.tech** (serverless Postgres, same tech Replit uses internally)
+   - **Self-hosted** (Docker: `postgres:16-alpine`)
+3. Restore: `psql $NEW_DATABASE_URL < dheer_backup.sql`
+4. Run schema sync: `npm run db:push`
+5. Set the new `DATABASE_URL` on the new host.
+
+The `sessions` and `users` tables must exist before the app starts (they are created by `db:push` — no manual SQL needed).
+
+---
+
+#### D5 — `SESSION_SECRET` Environment Variable (Medium)
+
+**What it does today:**  
+Signs and verifies session cookies. Currently set as a Replit secret.
+
+**Problem when migrating:**  
+It doesn't exist on the new host until you set it. If missing, `express-session` throws at startup.
+
+**Self-contained solution:**  
+Generate a new secret and set it as an environment variable on the new host:
+
+```bash
+# Generate a cryptographically strong secret
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+Set `SESSION_SECRET=<output>` in your hosting provider's environment variables panel. No code changes needed.
+
+Note: Changing the secret invalidates all existing sessions (users will need to log in again). This is expected and safe.
+
+---
+
+#### D6 — Hardcoded Replit App URL in Chrome Extension (High)
+
+**What it does today:**  
+`extension/sidepanel.js` line 3 contains:
+```js
+const API_BASE_URL = 'https://d-heer--hanvithsaia.replit.app';
+```
+Every API call from the extension is hard-wired to this Replit domain.
+
+**Problem when migrating:**  
+After moving to a new host, the extension continues to call the old Replit URL. It will break as soon as the Replit deployment is shut down.
+
+**Self-contained solution — Extension options page:**
+
+Add an extension options page where users set their own backend URL, saved to `chrome.storage.sync`:
+
+```js
+// extension/sidepanel.js — replace hardcoded URL with:
+let API_BASE_URL = 'https://d-heer--hanvithsaia.replit.app'; // fallback default
+
+chrome.storage.sync.get(['apiBaseUrl'], (result) => {
+  if (result.apiBaseUrl) API_BASE_URL = result.apiBaseUrl;
+});
+```
+
+```html
+<!-- extension/options.html -->
+<label>Backend URL: <input id="url" type="url" /></label>
+<button id="save">Save</button>
+<script>
+  chrome.storage.sync.get(['apiBaseUrl'], (r) => { document.getElementById('url').value = r.apiBaseUrl || ''; });
+  document.getElementById('save').onclick = () => {
+    chrome.storage.sync.set({ apiBaseUrl: document.getElementById('url').value });
+  };
+</script>
+```
+
+Add to `manifest.json`:
+```json
+"options_page": "options.html",
+"permissions": ["storage"]
+```
+
+This makes the extension work with any deployment of DHeer regardless of where it is hosted.
+
+---
+
+#### D7, D8, D9 — Replit Vite Plugins (Low)
+
+**What they do today:**
+
+| Plugin | Purpose |
+|---|---|
+| `@replit/vite-plugin-runtime-error-modal` | Overlays runtime errors in the Replit browser preview during development |
+| `@replit/vite-plugin-cartographer` | Provides Replit's AI with a map of the project's component tree |
+| `@replit/vite-plugin-dev-banner` | Shows a "Running on Replit" banner in the dev preview |
+
+All three are loaded only when `process.env.REPL_ID !== undefined` (D8 and D9 are already guarded). They add zero functionality in production builds.
+
+**Problem when migrating:**  
+These packages are in `devDependencies`. If `REPL_ID` is not set, D8 and D9 are never loaded. D7 (`runtimeErrorOverlay`) is always instantiated but only activates in development — it is harmless but wastes a package install.
+
+**Self-contained solution:**
+
+Remove the three Replit plugins from `vite.config.ts` and uninstall the packages:
+
+```ts
+// vite.config.ts — simplified, no Replit plugins
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+    },
+  },
+  root: path.resolve(import.meta.dirname, "client"),
+  build: {
+    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    emptyOutDir: true,
+  },
+});
+```
+
+Packages to uninstall:
+```
+@replit/vite-plugin-runtime-error-modal
+@replit/vite-plugin-cartographer
+@replit/vite-plugin-dev-banner
+```
+
+---
+
+#### D10 — `shared/models/auth.ts` Comments (Trivial)
+
+**What they do today:**  
+Comments on the `sessions` and `users` table definitions say "IMPORTANT: This table is mandatory for Replit Auth, don't drop it."
+
+**Problem when migrating:**  
+No functional impact. Misleading to future developers who have replaced Replit Auth.
+
+**Self-contained solution:**  
+Update the comments to reflect that these tables support the generic session-based auth system, not specifically Replit.
+
+---
+
+### 11.3 Migration Checklist
+
+Use this checklist when moving DHeer to any non-Replit host:
+
+#### Phase 1 — Database
+- [ ] Export data: `pg_dump $DATABASE_URL > dheer_backup.sql`
+- [ ] Provision a new PostgreSQL instance (Supabase / Railway / Render / self-hosted)
+- [ ] Restore data: `psql $NEW_DATABASE_URL < dheer_backup.sql`
+- [ ] Set `DATABASE_URL` on new host
+
+#### Phase 2 — Authentication
+- [ ] **Option A (keep OIDC):** Register DHeer as an OAuth app with Google / Auth0 / Keycloak; get `client_id` and `client_secret`; set `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`; rename env vars in `replitAuth.ts`
+- [ ] **Option B (local auth):** Implement `passport-local` with email + bcrypt password; add `passwordHash` column to `users`; add `/api/register` endpoint; remove `openid-client` dependency
+
+#### Phase 3 — Session
+- [ ] Generate new `SESSION_SECRET` (`node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`)
+- [ ] Set `SESSION_SECRET` on new host
+
+#### Phase 4 — Chrome Extension
+- [ ] Add options page to extension with editable backend URL field
+- [ ] Store URL in `chrome.storage.sync`
+- [ ] Load stored URL at sidepanel startup with fallback to default
+- [ ] Publish updated extension or load unpacked with new backend URL set
+
+#### Phase 5 — Build Tooling
+- [ ] Remove `@replit/vite-plugin-*` from `vite.config.ts`
+- [ ] Uninstall the three Replit Vite packages
+- [ ] Verify `npm run build` succeeds without `REPL_ID` in environment
+
+#### Phase 6 — Comments & Docs
+- [ ] Update comments in `shared/models/auth.ts` (remove Replit-specific warnings)
+- [ ] Update `replit.md` → rename to `README.md` or keep both
+
+---
+
+### 11.4 Recommended Hosting Stack (Fully Independent)
+
+| Layer | Recommended Option | Why |
+|---|---|---|
+| Web + API server | **Railway** or **Render** | One-click Node.js deploy; managed PostgreSQL included |
+| Database | **Neon.tech** or **Supabase** | Serverless Postgres; free tier; standard connection strings |
+| Authentication | **Google OAuth** (OIDC-compliant) | No vendor lock-in; uses existing `openid-client` code as-is |
+| Chrome Extension | Chrome Web Store or self-distributed `.crx` | Independent of any web host |
+| Secrets management | Host-native env vars panel | All major hosts support this natively |
+
+---
+
+## 12. Future Considerations (Out of Scope for v1)
 
 - Import/export bookmarks (JSON, HTML browser format)
 - Folder/collection hierarchy beyond flat tags
@@ -342,3 +685,4 @@ All API routes live under the `/api/` prefix. Protected routes require an authen
 - Mobile companion app (iOS/Firefox extension)
 - AI-powered bookmark suggestions based on domain frequency
 - Weekly digest email of top browsing insights
+- Firefox extension support (WebExtension API is largely compatible)
