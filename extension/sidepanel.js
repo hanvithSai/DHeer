@@ -155,20 +155,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const list = document.getElementById('ext-workspaces-list');
     list.innerHTML = '';
     if (workspaces.length === 0) {
-      list.innerHTML = '<div class="empty-state">No workspaces found</div>';
+      list.innerHTML = '<div class="text-[10px] text-[#895737] italic text-center p-4 bg-[#2a1f1b] rounded-xl">No workspaces found</div>';
       return;
     }
 
     workspaces.forEach(ws => {
       const div = document.createElement('div');
-      div.className = 'workspace-item';
+      div.className = 'bg-[#2a1f1b] p-4 rounded-xl flex items-center justify-between group hover:border-[#c08552] border border-transparent transition-all cursor-pointer';
       div.innerHTML = `
-        <div style="min-width:0;flex:1;">
-          <div class="workspace-item-name">${ws.name}</div>
-          <div class="workspace-item-meta">${ws.urls.length} Resource${ws.urls.length !== 1 ? 's' : ''}</div>
+        <div>
+          <div class="text-sm font-bold text-[#f3e9dc]">${ws.name}</div>
+          <div class="text-[8px] text-[#895737] uppercase tracking-widest">${ws.urls.length} Resources</div>
         </div>
-        <div style="padding:6px;background:rgba(192,133,82,0.1);border-radius:8px;color:#c08552;flex-shrink:0;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <div class="p-2 bg-[#c08552]/10 rounded-lg text-[#c08552]">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         </div>
       `;
       div.addEventListener('click', () => {
