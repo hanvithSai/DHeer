@@ -15,14 +15,54 @@ const mainContent = document.getElementById('main-content');
 const loginLink = document.getElementById('login-link');
 const recentList = document.getElementById('recent-list');
 
+// Populate URL and title fields from a tab object
+function populateTabFields(tab) {
+  if (!tab) return;
+  const url = tab.url || '';
+  const title = tab.title || '';
+  // Only update if the user hasn't manually edited the fields
+  if (!urlInput.dataset.userEdited) urlInput.value = url;
+  if (!titleInput.dataset.userEdited) titleInput.value = title;
+}
+
+// Fetch the active tab and populate fields
+async function syncActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  populateTabFields(tab);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-  // Get current tab info
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) {
-    titleInput.value = tab.title || '';
-    urlInput.value = tab.url || '';
-  }
+  // Get current tab info on open
+  await syncActiveTab();
+
+  // Track if the user manually edited either field
+  urlInput.addEventListener('input', () => { urlInput.dataset.userEdited = 'true'; });
+  titleInput.addEventListener('input', () => { titleInput.dataset.userEdited = 'true'; });
+
+  // Clear the manual-edit flag after saving so next tab switch auto-fills again
+  saveBtn.addEventListener('click', () => {
+    delete urlInput.dataset.userEdited;
+    delete titleInput.dataset.userEdited;
+  });
+
+  // Update fields whenever the user switches to a different tab
+  chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    delete urlInput.dataset.userEdited;
+    delete titleInput.dataset.userEdited;
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    populateTabFields(tab);
+  });
+
+  // Update fields when the active tab navigates to a new URL
+  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete') {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab && activeTab.id === tabId) {
+        populateTabFields(tab);
+      }
+    }
+  });
 
   // Check auth status
   checkAuth();
