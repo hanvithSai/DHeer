@@ -13,45 +13,265 @@
       --text-muted: #895737;
       --border: #3d2b26;
     }
-    
-    * { box-sizing: border-box; transition: all 0.2s ease; }
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background-color: var(--background); color: var(--text); font-size: 14px; }
+
+    /* Box-sizing reset; transitions only on interactive elements (not layout) */
+    *, *::before, *::after { box-sizing: border-box; }
+    button, a, input, textarea {
+      transition: background 0.15s ease, border-color 0.15s ease,
+                  color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    /* html + body fill the whole window; body never scrolls — main does */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--background);
+      color: var(--text);
+      font-size: 14px;
+    }
+
     .hidden { display: none !important; }
-    
-    #auth-check { display: flex; flex-direction: column; items: center; justify-content: center; height: 100vh; padding: 24px; text-align: center; }
-    .logo-large { width: 64px; height: 64px; background: rgba(192, 133, 82, 0.2); border-radius: 16px; display: flex; items-center: center; justify-content: center; font-size: 32px; margin-bottom: 24px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
-    
-    #main-content { height: 100vh; display: flex; flex-direction: column; }
-    header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: rgba(26, 20, 18, 0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 10; }
-    .nav-tabs { display: flex; gap: 4px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 8px; }
-    .nav-tab { padding: 8px; border-radius: 6px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; }
+
+    /* Custom scrollbar — thin and on-brand */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+    /* ── Auth screen ─────────────────────────────────────────────────────── */
+    #auth-check {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 24px;
+      text-align: center;
+      overflow-y: auto; /* scroll if window is very short */
+    }
+    .logo-large {
+      width: 64px; height: 64px;
+      background: rgba(192, 133, 82, 0.2);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      margin-bottom: 24px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+      flex-shrink: 0;
+    }
+
+    /* ── Main shell: sticky header + scrollable body ─────────────────────── */
+    #main-content {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; /* clip children; only <main> scrolls */
+    }
+
+    header {
+      flex-shrink: 0; /* header never collapses */
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: rgba(26, 20, 18, 0.95);
+      backdrop-filter: blur(10px);
+      z-index: 10;
+      min-width: 0; /* allow flex children to shrink */
+    }
+
+    /* Left side of header shrinks gracefully */
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .header-left span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Right side: nav tabs + window controls */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+    }
+    .nav-tab {
+      padding: 7px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .nav-tab:hover { background: rgba(255,255,255,0.05); }
     .nav-tab.active { color: var(--primary); background: rgba(192, 133, 82, 0.1); }
 
-    .window-btn { width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+    .window-btn {
+      width: 28px; height: 28px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+    }
     .window-btn:hover { background: rgba(192,133,82,0.12); color: var(--primary); }
     .window-controls { display: flex; align-items: center; gap: 2px; }
 
-    /* Popup mode: add a subtle drag bar at the top */
-    body.popup-mode header { cursor: default; -webkit-app-region: drag; }
-    body.popup-mode header button, body.popup-mode header input { -webkit-app-region: no-drag; }
-    body.popup-mode { border-radius: 12px; overflow: hidden; }
+    /* Popup-mode tweak: header is the drag handle */
+    body.popup-mode header { cursor: grab; -webkit-app-region: drag; }
+    body.popup-mode header * { -webkit-app-region: no-drag; }
 
-    main { flex: 1; overflow-y: auto; padding: 16px; }
-    .label { font-size: 10px; text-transform: uppercase; font-weight: 900; color: var(--text-muted); tracking: 0.15em; margin-bottom: 8px; display: block; }
-    input, textarea { width: 100%; background: var(--card-bg); border: 1px solid transparent; border-radius: 12px; padding: 12px; color: var(--text); font-size: 13px; margin-bottom: 16px; }
+    /* ── Scrollable content area ─────────────────────────────────────────── */
+    main {
+      flex: 1;
+      min-height: 0;      /* critical: lets flex child shrink below content size */
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px;
+    }
+
+    /* ── Form elements ───────────────────────────────────────────────────── */
+    .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: block;
+    }
+    input, textarea {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 13px;
+      margin-bottom: 14px;
+      font-family: inherit;
+      resize: vertical;
+    }
     input:focus, textarea:focus { outline: none; border-color: var(--primary); }
-    
-    .btn-primary { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(192, 133, 82, 0.2); }
-    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .insight-card { background: var(--card-bg); border-radius: 16px; padding: 24px; display: grid; grid-template-columns: 1fr 1px 1fr; gap: 16px; text-align: center; }
-    .insight-value { font-size: 32px; font-weight: 700; }
-    .insight-divider { background: var(--border); height: 100%; }
-    
-    .workspace-item { background: var(--card-bg); padding: 16px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid transparent; cursor: pointer; margin-bottom: 8px; }
+    .btn-primary {
+      width: 100%;
+      padding: 11px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(192, 133, 82, 0.2);
+    }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── Companion cards ─────────────────────────────────────────────────── */
+    .insight-card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;          /* flex instead of grid — collapses cleanly */
+      align-items: center;
+      justify-content: space-around;
+      gap: 12px;
+      text-align: center;
+    }
+    .insight-stat { flex: 1; min-width: 0; }
+    .insight-value { font-size: 28px; font-weight: 700; line-height: 1.1; }
+    .insight-divider { width: 1px; align-self: stretch; background: var(--border); flex-shrink: 0; }
+
+    .workspace-item {
+      background: var(--card-bg);
+      padding: 14px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid transparent;
+      cursor: pointer;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
     .workspace-item:hover { border-color: var(--primary); background: rgba(192, 133, 82, 0.05); }
+    .workspace-item-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .workspace-item-meta {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 2px;
+    }
+
+    /* ── Recent bookmarks list ───────────────────────────────────────────── */
+    .recent-item {
+      background: var(--card-bg);
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .recent-item:hover { border-color: var(--border); }
+    .recent-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .recent-url {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .empty-state {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 16px 0;
+    }
   </style>
 </head>
 <body>
@@ -64,30 +284,26 @@
 
   <div id="main-content" class="hidden">
     <header>
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 32px; height: 32px; background: rgba(192, 133, 82, 0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;">🦌</div>
-        <span id="user-display" style="font-weight: 700; font-size: 14px;">DHeer</span>
+      <div class="header-left">
+        <div style="width:30px;height:30px;background:rgba(192,133,82,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🦌</div>
+        <span id="user-display">DHeer</span>
       </div>
-      <div style="display:flex; align-items:center; gap:6px;">
+      <div class="header-right">
         <div class="nav-tabs">
           <button id="nav-bookmark" class="nav-tab active" title="Bookmarks">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
           </button>
           <button id="nav-companion" class="nav-tab" title="Companion">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </button>
         </div>
         <div class="window-controls">
-          <!-- Popout button: visible only in sidepanel mode -->
           <button id="btn-popout" class="window-btn" title="Pop out to window">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <!-- Browser/window outer frame -->
               <rect x="2" y="4" width="20" height="16" rx="2"/>
-              <!-- Mini-player box pinned to bottom-right (filled, like YT miniplayer) -->
               <rect x="13" y="13" width="7" height="5" rx="1" fill="currentColor" stroke="none"/>
             </svg>
           </button>
-          <!-- Dock button: visible only in popup mode -->
           <button id="btn-dock" class="window-btn hidden" title="Dock to sidebar">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
@@ -108,26 +324,32 @@
         <label class="label">Notes</label>
         <textarea id="note" rows="3"></textarea>
         <button id="save-btn" class="btn-primary">Save to DHeer</button>
-        <p id="status-message" style="text-align: center; font-size: 12px; margin-top: 12px; height: 18px;"></p>
-        
-        <div style="margin-top: 32px;">
+        <p id="status-message" style="text-align:center;font-size:12px;margin-top:10px;min-height:18px;"></p>
+
+        <div style="margin-top:28px;">
           <label class="label">Recently Saved</label>
-          <div id="recent-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+          <div id="recent-list" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
       </div>
 
       <div id="companion-section" class="hidden">
-        <div style="margin-bottom: 32px;">
+        <div style="margin-bottom:28px;">
           <label class="label">Insights</label>
           <div class="insight-card">
-            <div><div id="ext-tab-count" class="insight-value">--</div><div class="label" style="margin-bottom:0">Tabs</div></div>
+            <div class="insight-stat">
+              <div id="ext-tab-count" class="insight-value">--</div>
+              <div class="label" style="margin-bottom:0;">Tabs</div>
+            </div>
             <div class="insight-divider"></div>
-            <div><div id="ext-tab-switches" class="insight-value">--</div><div class="label" style="margin-bottom:0">Switches</div></div>
+            <div class="insight-stat">
+              <div id="ext-tab-switches" class="insight-value">--</div>
+              <div class="label" style="margin-bottom:0;">Switches</div>
+            </div>
           </div>
         </div>
-        
+
         <label class="label">Workspaces</label>
-        <div id="ext-workspaces-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        <div id="ext-workspaces-list" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
     </main>
   </div>
