@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "7yGUHNwuL0w7CWUAaS97D"
+uri = "file://PRD.md"
+type = "text"
+title = "DHeer — Product Requirements Document"
