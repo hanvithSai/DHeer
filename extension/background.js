@@ -106,11 +106,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     config = { ...config, ...request.config };
   } else if (request.type === 'LAUNCH_WORKSPACE') {
     launchWorkspace(request.urls);
-  } else if (request.type === 'OPEN_SIDEPANEL') {
-    // Re-dock: open the sidepanel in the current active window
+  } else if (request.type === 'CLOSE_SIDEPANEL') {
+    // Disable sidepanel on the active tab so it closes when popout opens
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
-        chrome.sidePanel.open({ windowId: tabs[0].windowId }).catch(() => {});
+        chrome.sidePanel.setOptions({ tabId: tabs[0].id, enabled: false }).catch(() => {});
+      }
+    });
+  } else if (request.type === 'OPEN_SIDEPANEL') {
+    // Re-dock: re-enable then open the sidepanel in the current active window
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.sidePanel.setOptions({ tabId: tabs[0].id, enabled: true })
+          .then(() => chrome.sidePanel.open({ windowId: tabs[0].windowId }))
+          .catch(() => {});
       }
     });
   }

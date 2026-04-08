@@ -87,8 +87,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnPopout.classList.remove('hidden');
     btnDock.classList.add('hidden');
 
-    // Popout: open this same page as a floating popup window
+    // Popout: close the sidepanel then open as a floating popup window
     btnPopout.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'CLOSE_SIDEPANEL' });
       const popupUrl = chrome.runtime.getURL('sidepanel.html?mode=popup');
       chrome.windows.create({
         url: popupUrl,
