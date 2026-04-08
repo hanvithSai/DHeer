@@ -106,6 +106,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     config = { ...config, ...request.config };
   } else if (request.type === 'LAUNCH_WORKSPACE') {
     launchWorkspace(request.urls);
+  } else if (request.type === 'OPEN_SIDEPANEL') {
+    // Re-dock: open the sidepanel in the current active window
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.sidePanel.open({ windowId: tabs[0].windowId }).catch(() => {});
+      }
+    });
   }
   return true; // Keep message channel open for async response
 });
