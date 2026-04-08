@@ -32,12 +32,20 @@
     .window-btn:hover { background: rgba(192,133,82,0.12); color: var(--primary); }
     .window-controls { display: flex; align-items: center; gap: 2px; }
 
-    /* Popup mode: add a subtle drag bar at the top */
+    main { flex: 1; overflow-y: auto; padding: 16px; }
+
+    /* Styled scrollbar — visible in both sidepanel and popup mode */
+    main::-webkit-scrollbar { width: 6px; }
+    main::-webkit-scrollbar-track { background: transparent; }
+    main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    main::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+    /* Popup mode */
+    body.popup-mode { border-radius: 12px; overflow: hidden; height: 100vh; }
     body.popup-mode header { cursor: default; -webkit-app-region: drag; }
     body.popup-mode header button, body.popup-mode header input { -webkit-app-region: no-drag; }
-    body.popup-mode { border-radius: 12px; overflow: hidden; }
-
-    main { flex: 1; overflow-y: auto; padding: 16px; }
+    body.popup-mode #main-content { height: 100vh; max-height: 100vh; }
+    body.popup-mode main { max-height: calc(100vh - 65px); overflow-y: scroll; scroll-behavior: smooth; }
     .label { font-size: 10px; text-transform: uppercase; font-weight: 900; color: var(--text-muted); tracking: 0.15em; margin-bottom: 8px; display: block; }
     input, textarea { width: 100%; background: var(--card-bg); border: 1px solid transparent; border-radius: 12px; padding: 12px; color: var(--text); font-size: 13px; margin-bottom: 16px; }
     input:focus, textarea:focus { outline: none; border-color: var(--primary); }
