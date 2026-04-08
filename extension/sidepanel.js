@@ -2,6 +2,9 @@
 
 const API_BASE_URL = 'https://d-heer--hanvithsaia.replit.app';
 
+// Detect if this page is running as a detached popup window
+const IS_POPUP_MODE = new URLSearchParams(window.location.search).get('mode') === 'popup';
+
 // Elements
 const userDisplay = document.getElementById('user-display');
 const titleInput = document.getElementById('title');
@@ -63,6 +66,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   });
+
+  // ── Popup / Dock mode setup ──────────────────────────────────────────
+  const btnPopout = document.getElementById('btn-popout');
+  const btnDock   = document.getElementById('btn-dock');
+
+  if (IS_POPUP_MODE) {
+    // Running as a detached popup window
+    document.body.classList.add('popup-mode');
+    btnPopout.classList.add('hidden');
+    btnDock.classList.remove('hidden');
+
+    // Dock: reopen sidepanel and close this popup window
+    btnDock.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
+      window.close();
+    });
+  } else {
+    // Running as a sidepanel
+    btnPopout.classList.remove('hidden');
+    btnDock.classList.add('hidden');
+
+    // Popout: open this same page as a floating popup window
+    btnPopout.addEventListener('click', () => {
+      const popupUrl = chrome.runtime.getURL('sidepanel.html?mode=popup');
+      chrome.windows.create({
+        url: popupUrl,
+        type: 'popup',
+        width: 420,
+        height: 680,
+        focused: true
+      });
+    });
+  }
+  // ────────────────────────────────────────────────────────────────────
 
   // Check auth status
   checkAuth();
