@@ -35,11 +35,12 @@
 
     .hidden { display: none !important; }
 
-    /* Custom scrollbar — thin and on-brand */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
+    /* Custom scrollbar — appears only when content overflows, both axes */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); border-radius: 4px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+    ::-webkit-scrollbar-corner { background: transparent; }
 
     /* ── Auth screen ─────────────────────────────────────────────────────── */
     #auth-check {
@@ -153,7 +154,7 @@
       flex: 1;
       min-height: 0;      /* critical: lets flex child shrink below content size */
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: auto;   /* horizontal scrollbar only when content actually overflows */
       padding: 16px;
     }
 
