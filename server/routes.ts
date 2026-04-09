@@ -191,6 +191,84 @@ export async function registerRoutes(
     }
   });
 
+  // === Todo Statuses API ===
+  app.get("/api/todo-statuses", requireAuth, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    const statuses = await storage.getTodoStatuses(userId);
+    res.json(statuses);
+  });
+
+  app.post("/api/todo-statuses", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const { insertTodoStatusSchema } = await import("@shared/schema");
+      const input = insertTodoStatusSchema.parse(req.body);
+      const status = await storage.createTodoStatus(userId, input);
+      res.status(201).json(status);
+    } catch (err) {
+      if (err instanceof z.ZodError) res.status(400).json({ message: err.errors[0].message });
+      else res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.patch("/api/todo-statuses/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const { insertTodoStatusSchema } = await import("@shared/schema");
+      const input = insertTodoStatusSchema.partial().parse(req.body);
+      const status = await storage.updateTodoStatus(userId, Number(req.params.id), input);
+      res.json(status);
+    } catch (err) {
+      if (err instanceof z.ZodError) res.status(400).json({ message: err.errors[0].message });
+      else res.status(404).json({ message: "Status not found" });
+    }
+  });
+
+  app.delete("/api/todo-statuses/:id", requireAuth, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    await storage.deleteTodoStatus(userId, Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // === Todos API ===
+  app.get("/api/todos", requireAuth, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    const items = await storage.getTodos(userId);
+    res.json(items);
+  });
+
+  app.post("/api/todos", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const { insertTodoSchema } = await import("@shared/schema");
+      const input = insertTodoSchema.parse(req.body);
+      const todo = await storage.createTodo(userId, input);
+      res.status(201).json(todo);
+    } catch (err) {
+      if (err instanceof z.ZodError) res.status(400).json({ message: err.errors[0].message });
+      else res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.patch("/api/todos/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const { insertTodoSchema } = await import("@shared/schema");
+      const input = insertTodoSchema.partial().parse(req.body);
+      const todo = await storage.updateTodo(userId, Number(req.params.id), input);
+      res.json(todo);
+    } catch (err) {
+      if (err instanceof z.ZodError) res.status(400).json({ message: err.errors[0].message });
+      else res.status(404).json({ message: "Todo not found" });
+    }
+  });
+
+  app.delete("/api/todos/:id", requireAuth, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    await storage.deleteTodo(userId, Number(req.params.id));
+    res.status(204).end();
+  });
+
   await seedDatabase();
 
   return httpServer;

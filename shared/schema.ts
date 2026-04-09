@@ -120,3 +120,41 @@ export type InsertCompanionSettings = z.infer<typeof insertCompanionSettingsSche
 export type CreateBookmarkRequest = InsertBookmark & { tags?: string[] };
 export type UpdateBookmarkRequest = Partial<CreateBookmarkRequest>;
 export type BookmarkResponse = Bookmark & { tags: Tag[] };
+
+// ── Todo Statuses ─────────────────────────────────────────────────────────────
+export const todoStatuses = pgTable("todo_statuses", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  name: varchar("name", { length: 50 }).notNull(),
+  color: varchar("color", { length: 7 }).notNull().default("#c08552"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+// ── Todos ─────────────────────────────────────────────────────────────────────
+export const todos = pgTable("todos", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  note: text("note"),
+  priority: varchar("priority", { length: 10 }).default("medium"), // low | medium | high
+  statusId: integer("status_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const todoStatusesRelations = relations(todoStatuses, ({ one }) => ({
+  user: one(users, { fields: [todoStatuses.userId], references: [users.id] }),
+}));
+
+export const todosRelations = relations(todos, ({ one }) => ({
+  user: one(users, { fields: [todos.userId], references: [users.id] }),
+  status: one(todoStatuses, { fields: [todos.statusId], references: [todoStatuses.id] }),
+}));
+
+export const insertTodoStatusSchema = createInsertSchema(todoStatuses).omit({ id: true, userId: true });
+export const insertTodoSchema = createInsertSchema(todos).omit({ id: true, userId: true, createdAt: true, updatedAt: true });
+
+export type TodoStatus = typeof todoStatuses.$inferSelect;
+export type InsertTodoStatus = z.infer<typeof insertTodoStatusSchema>;
+export type Todo = typeof todos.$inferSelect;
+export type InsertTodo = z.infer<typeof insertTodoSchema>;

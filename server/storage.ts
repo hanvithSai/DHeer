@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { 
   bookmarks, tags, bookmarkTags, workspaces, companionSettings,
+  todoStatuses, todos,
   type CreateBookmarkRequest,
   type UpdateBookmarkRequest,
   type BookmarkResponse,
@@ -9,9 +10,13 @@ import {
   type Workspace,
   type InsertWorkspace,
   type CompanionSettings,
-  type InsertCompanionSettings
+  type InsertCompanionSettings,
+  type TodoStatus,
+  type InsertTodoStatus,
+  type Todo,
+  type InsertTodo,
 } from "@shared/schema";
-import { eq, desc, and, ilike, sql, or } from "drizzle-orm";
+import { eq, desc, asc, and, ilike, sql, or } from "drizzle-orm";
 import { users, type User } from "@shared/models/auth";
 
 export interface IStorage {
@@ -34,6 +39,18 @@ export interface IStorage {
   // Companion Settings
   getCompanionSettings(userId: string): Promise<CompanionSettings>;
   updateCompanionSettings(userId: string, updates: Partial<InsertCompanionSettings>): Promise<CompanionSettings>;
+
+  // Todo Statuses
+  getTodoStatuses(userId: string): Promise<TodoStatus[]>;
+  createTodoStatus(userId: string, status: InsertTodoStatus): Promise<TodoStatus>;
+  updateTodoStatus(userId: string, id: number, updates: Partial<InsertTodoStatus>): Promise<TodoStatus>;
+  deleteTodoStatus(userId: string, id: number): Promise<void>;
+
+  // Todos
+  getTodos(userId: string): Promise<Todo[]>;
+  createTodo(userId: string, todo: InsertTodo): Promise<Todo>;
+  updateTodo(userId: string, id: number, updates: Partial<InsertTodo>): Promise<Todo>;
+  deleteTodo(userId: string, id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -213,11 +230,75 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     if (!updated) {
-       // @ts-ignore - Dynamic insertion of Partial<InsertCompanionSettings> with userId
+       // @ts-ignore
        const [newSettings] = await db.insert(companionSettings).values({ ...updates, userId }).returning();
        return newSettings;
     }
     return updated;
+  }
+
+  // ── Todo Statuses ───────────────────────────────────────────────────────────
+  async getTodoStatuses(userId: string): Promise<TodoStatus[]> {
+    const statuses = await db.select().from(todoStatuses)
+      .where(eq(todoStatuses.userId, userId))
+      .orderBy(asc(todoStatuses.sortOrder), asc(todoStatuses.id));
+
+    if (statuses.length === 0) {
+      // Seed defaults on first fetch
+      const defaults = [
+        { userId, name: "To Do",      color: "#c08552", sortOrder: 0 },
+        { userId, name: "In Progress", color: "#895737", sortOrder: 1 },
+        { userId, name: "Done",        color: "#4ade80", sortOrder: 2 },
+      ];
+      const seeded = await db.insert(todoStatuses).values(defaults).returning();
+      return seeded;
+    }
+    return statuses;
+  }
+
+  async createTodoStatus(userId: string, status: InsertTodoStatus): Promise<TodoStatus> {
+    const [created] = await db.insert(todoStatuses).values({ ...status, userId }).returning();
+    return created;
+  }
+
+  async updateTodoStatus(userId: string, id: number, updates: Partial<InsertTodoStatus>): Promise<TodoStatus> {
+    const [updated] = await db.update(todoStatuses)
+      .set(updates)
+      .where(and(eq(todoStatuses.id, id), eq(todoStatuses.userId, userId)))
+      .returning();
+    if (!updated) throw new Error("Status not found");
+    return updated;
+  }
+
+  async deleteTodoStatus(userId: string, id: number): Promise<void> {
+    // Unlink todos referencing this status
+    await db.update(todos).set({ statusId: null }).where(and(eq(todos.userId, userId), eq(todos.statusId, id)));
+    await db.delete(todoStatuses).where(and(eq(todoStatuses.id, id), eq(todoStatuses.userId, userId)));
+  }
+
+  // ── Todos ───────────────────────────────────────────────────────────────────
+  async getTodos(userId: string): Promise<Todo[]> {
+    return db.select().from(todos)
+      .where(eq(todos.userId, userId))
+      .orderBy(desc(todos.createdAt));
+  }
+
+  async createTodo(userId: string, todo: InsertTodo): Promise<Todo> {
+    const [created] = await db.insert(todos).values({ ...todo, userId }).returning();
+    return created;
+  }
+
+  async updateTodo(userId: string, id: number, updates: Partial<InsertTodo>): Promise<Todo> {
+    const [updated] = await db.update(todos)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(todos.id, id), eq(todos.userId, userId)))
+      .returning();
+    if (!updated) throw new Error("Todo not found");
+    return updated;
+  }
+
+  async deleteTodo(userId: string, id: number): Promise<void> {
+    await db.delete(todos).where(and(eq(todos.id, id), eq(todos.userId, userId)));
   }
 }
 
