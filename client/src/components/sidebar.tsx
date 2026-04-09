@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hash, Home, Star, Tag, LogOut, Loader2, Globe, MoreVertical, Edit2, Trash2, Check, X, Layout, Shield } from 'lucide-react';
+import { Hash, Home, Star, Tag, LogOut, Loader2, Globe, MoreVertical, Edit2, Trash2, Check, X, Layout, Shield, CheckSquare } from 'lucide-react';
 import { CompanionPanel } from './companion-panel';
+import { TodoPanel } from './todo-panel';
 import {
   Sheet,
   SheetContent,
@@ -40,6 +41,8 @@ export function Sidebar({ className }: SidebarProps) {
   // Get search param 'tag'
   const params = new URLSearchParams(window.location.search);
   const currentTag = params.get('tag');
+
+  const [todoSheetOpen, setTodoSheetOpen] = useState(false);
 
   const navItems = [
     { label: 'All Bookmarks', icon: Home, path: '/', active: location === '/' && !currentTag },
@@ -101,6 +104,33 @@ export function Sidebar({ className }: SidebarProps) {
             </Link>
           ))}
         </div>
+
+        {/* My Tasks — opens TodoPanel sheet */}
+        <Sheet open={todoSheetOpen} onOpenChange={setTodoSheetOpen}>
+          <SheetTrigger asChild>
+            <div
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
+                "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              )}
+              data-testid="nav-my-tasks"
+            >
+              <CheckSquare className="w-4 h-4" />
+              My Tasks
+            </div>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[360px] p-0 border-r border-white/5 bg-background">
+            <SheetHeader className="p-6 border-b border-white/5">
+              <SheetTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center text-lg">✅</div>
+                My Tasks
+              </SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-hidden h-[calc(100vh-88px)]">
+              <TodoPanel />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Tags Section */}
         <div className="space-y-1">

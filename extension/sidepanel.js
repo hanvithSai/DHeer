@@ -106,15 +106,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkAuth();
   
   // Show/Hide sections
+  const ALL_SECTIONS = ['bookmark-section', 'companion-section', 'todo-section'];
   const showSection = (sectionId) => {
-    ['bookmark-section', 'companion-section'].forEach(id => {
-      document.getElementById(id).classList.add('hidden');
-    });
+    ALL_SECTIONS.forEach(id => { document.getElementById(id).classList.add('hidden'); });
     document.getElementById(sectionId).classList.remove('hidden');
+    // Update active tab button
+    ['nav-bookmark', 'nav-companion', 'nav-todo'].forEach(id => {
+      document.getElementById(id).classList.remove('active');
+    });
+    const sectionToNav = { 'bookmark-section': 'nav-bookmark', 'companion-section': 'nav-companion', 'todo-section': 'nav-todo' };
+    const navId = sectionToNav[sectionId];
+    if (navId) document.getElementById(navId).classList.add('active');
   };
 
   document.getElementById('nav-bookmark').addEventListener('click', () => showSection('bookmark-section'));
-  document.getElementById('nav-companion').addEventListener('click', () => showSection('companion-section'));
+  document.getElementById('nav-companion').addEventListener('click', () => { showSection('companion-section'); fetchCompanionData(); });
+  document.getElementById('nav-todo').addEventListener('click', () => { showSection('todo-section'); loadTodos(); });
 
   // Companion logic
   const updateDisplay = (data) => {
@@ -180,6 +187,51 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setInterval(fetchCompanionData, 5000);
   fetchCompanionData();
+
+  // ── Todo tab logic ──────────────────────────────────────────────────────────
+  let todoStatuses = [];
+  let todosData = [];
+  let todoFilter = 'all';
+
+  window._dheerTodoFilter = 'all';
+
+  // Priority filter buttons
+  document.querySelectorAll('.todo-priority-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      window._dheerTodoFilter = btn.dataset.filter;
+      document.querySelectorAll('.todo-priority-btn').forEach(b => {
+        b.className = 'todo-priority-btn';
+      });
+      btn.classList.add('active-' + window._dheerTodoFilter);
+      renderTodos(window._dheerTodos, window._dheerStatuses);
+    });
+  });
+
+  // Add todo form
+  document.getElementById('todo-add-btn').addEventListener('click', async () => {
+    const title = document.getElementById('todo-add-input').value.trim();
+    if (!title) return;
+    const priority = document.getElementById('todo-add-priority').value;
+    const statusIdRaw = document.getElementById('todo-add-status').value;
+    const statusId = statusIdRaw ? parseInt(statusIdRaw) : undefined;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/todos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, priority, statusId: statusId || null }),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        document.getElementById('todo-add-input').value = '';
+        await loadTodos();
+      }
+    } catch (err) { console.error('Failed to add todo', err); }
+  });
+
+  document.getElementById('todo-add-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('todo-add-btn').click();
+  });
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // Setup listeners
   saveBtn.addEventListener('click', saveBookmark);
@@ -308,4 +360,125 @@ function renderRecent(bookmarks) {
     });
     recentList.appendChild(div);
   });
+}
+
+// ── Todo functions ─────────────────────────────────────────────────────────────
+async function loadTodos() {
+  try {
+    const [todosRes, statusesRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/todos`, { credentials: 'include' }),
+      fetch(`${API_BASE_URL}/api/todo-statuses`, { credentials: 'include' })
+    ]);
+    if (!todosRes.ok || !statusesRes.ok) return;
+    const todos = await todosRes.json();
+    const statuses = await statusesRes.json();
+
+    // Update status dropdown in add form
+    const statusSelect = document.getElementById('todo-add-status');
+    statusSelect.innerHTML = '<option value="">No status</option>';
+    statuses.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name;
+      statusSelect.appendChild(opt);
+    });
+
+    // Store globally inside closure (DOMContentLoaded scope holds todoStatuses/todosData)
+    // We re-render directly here
+    renderTodos(todos, statuses);
+
+    // Persist for filter re-renders: attach to window for closure access
+    window._dheerTodos = todos;
+    window._dheerStatuses = statuses;
+  } catch (err) {
+    console.error('Failed to load todos', err);
+  }
+}
+
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+
+function renderTodos(todos, statuses) {
+  // Use window cache if called from filter buttons
+  const allTodos = todos || window._dheerTodos || [];
+  const allStatuses = statuses || window._dheerStatuses || [];
+
+  // Apply filter (todoFilter is defined in DOMContentLoaded scope; fallback to 'all')
+  const filter = window._dheerTodoFilter || 'all';
+  const filtered = filter === 'all' ? allTodos : allTodos.filter(t => t.priority === filter);
+
+  // Sort by priority
+  const sorted = [...filtered].sort((a, b) =>
+    (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1)
+  );
+
+  const list = document.getElementById('todo-list');
+  list.innerHTML = '';
+
+  if (sorted.length === 0) {
+    list.innerHTML = '<div style="text-align:center; padding:32px 0; color: var(--text-muted); font-size:13px;">No tasks yet — add one above!</div>';
+    return;
+  }
+
+  sorted.forEach(todo => {
+    const status = allStatuses.find(s => s.id === todo.statusId);
+    const isDone = status && status.name === 'Done';
+    const priorityBadgeClass = `todo-priority-badge badge-${todo.priority || 'medium'}`;
+
+    const div = document.createElement('div');
+    div.className = 'todo-item' + (isDone ? ' done' : '');
+
+    div.innerHTML = `
+      <div class="todo-check ${isDone ? 'checked' : ''}" data-id="${todo.id}" data-done="${isDone}">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="todo-body">
+        <div class="todo-title">${escapeHtml(todo.title)}</div>
+        <div class="todo-meta">
+          <span class="${priorityBadgeClass}">${capitalize(todo.priority || 'medium')}</span>
+          ${status ? `<span class="todo-status-dot" style="background:${status.color}"></span><span class="todo-status-label">${escapeHtml(status.name)}</span>` : ''}
+        </div>
+      </div>
+      <button class="todo-delete-btn" data-id="${todo.id}" title="Delete">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
+    `;
+
+    // Toggle done
+    div.querySelector('.todo-check').addEventListener('click', async (e) => {
+      const id = parseInt(e.currentTarget.dataset.id);
+      const currentlyDone = e.currentTarget.dataset.done === 'true';
+      const doneStatus = allStatuses.find(s => s.name === 'Done');
+      const todoStatus = allStatuses.find(s => s.name === 'To Do');
+      const targetStatusId = currentlyDone ? (todoStatus?.id ?? null) : (doneStatus?.id ?? null);
+      try {
+        await fetch(`${API_BASE_URL}/api/todos/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ statusId: targetStatusId }),
+          credentials: 'include'
+        });
+        await loadTodos();
+      } catch (err) { console.error('Toggle done failed', err); }
+    });
+
+    // Delete
+    div.querySelector('.todo-delete-btn').addEventListener('click', async (e) => {
+      const id = parseInt(e.currentTarget.dataset.id);
+      try {
+        await fetch(`${API_BASE_URL}/api/todos/${id}`, { method: 'DELETE', credentials: 'include' });
+        await loadTodos();
+      } catch (err) { console.error('Delete todo failed', err); }
+    });
+
+    list.appendChild(div);
+  });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
