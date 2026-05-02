@@ -1,688 +1,403 @@
-# DHeer — Product Requirements Document
-
-**Version:** 1.1  
-**Date:** April 2026  
-**Status:** Living Document
+# Product Requirements Document
+## DHeer — Bookmark Manager & Browsing Companion
 
 ---
 
-## 1. Product Overview
+| Field | Detail |
+|---|---|
+| **Product** | DHeer |
+| **Version** | 2.0 |
+| **Status** | Living Document |
+| **Owner** | Product |
+| **Last Updated** | May 2026 |
 
-DHeer is a full-stack bookmark manager with an integrated Chrome extension. It helps users save, organize, and discover URLs while a virtual deer mascot companion monitors browsing habits and nudges users toward healthier productivity patterns.
+---
 
-### Vision
+## Table of Contents
 
-Give every user a smart, private, and delightful place to save what matters on the web — plus a friendly companion that helps them stay focused without feeling surveilled.
+1. [Executive Summary](#1-executive-summary)
+2. [Problem Statement](#2-problem-statement)
+3. [Goals & Success Metrics](#3-goals--success-metrics)
+4. [User Personas](#4-user-personas)
+5. [User Stories](#5-user-stories)
+6. [Feature Requirements](#6-feature-requirements)
+7. [Non-Functional Requirements](#7-non-functional-requirements)
+8. [Out of Scope](#8-out-of-scope)
+9. [Risks & Dependencies](#9-risks--dependencies)
+10. [Milestones](#10-milestones)
+11. [Appendix](#11-appendix)
 
-### Design Language
+---
 
-DHeer uses a warm "Deer Brown" palette throughout all surfaces:
+## 1. Executive Summary
+
+DHeer is a personal bookmark manager with an integrated Chrome extension and a browsing companion that encourages focused, mindful work. Users save URLs from any page, organise them with tags, discover content in a public community feed, and get gentle nudges when their browsing habits drift — too many tabs, too much idle time.
+
+The product is live on the web and in the Chrome extension sidebar. The current milestone focuses on stabilising the core loop (save → organise → discover), completing the companion nudge system, and improving the pop-out chat experience.
+
+---
+
+## 2. Problem Statement
+
+### The Core Problem
+Knowledge workers accumulate dozens of browser tabs and bookmarks with no meaningful system behind them. The browser's native bookmark bar is flat, unsearchable, and disconnected from productivity intent.
+
+### Why Existing Solutions Fall Short
+
+| Tool | Gap |
+|---|---|
+| Browser bookmarks | No tags, no notes, no sharing, no search by content |
+| Read-later apps (Pocket, Instapaper) | Read-only focus; no community; no browsing awareness |
+| Note-taking apps (Notion, Obsidian) | Heavy setup; not designed for quick URL capture |
+| Tab managers | Manage open tabs, not saved references |
+
+### Opportunity
+A lightweight, opinionated bookmark manager that lives in the browser sidebar — capturing URLs in one click, surfacing them through search and tags, and passively monitoring browsing health — fills the gap no existing tool addresses end-to-end.
+
+---
+
+## 3. Goals & Success Metrics
+
+### Product Goals
+
+| # | Goal |
+|---|---|
+| G1 | Make saving a URL from any page a single action |
+| G2 | Make finding a saved URL faster than a Google search |
+| G3 | Surface community-curated links that users actually want to read |
+| G4 | Reduce tab overload through awareness, not restriction |
+
+### Success Metrics
+
+| Metric | Target | How Measured |
+|---|---|---|
+| Bookmark save rate | ≥ 3 saves / active user / week | Server event log |
+| Search-to-find rate | ≥ 70% of searches result in a click | Frontend analytics |
+| Public feed engagement | ≥ 20% of logged-in users view public feed per week | Server log |
+| Nudge opt-out rate | < 30% of users disable nudges within 7 days | companion_settings table |
+| Extension retention | ≥ 60% of installers active after 14 days | Extension event |
+| Side panel open rate | ≥ 1 open / active day / user | Extension event |
+
+---
+
+## 4. User Personas
+
+### P1 — The Researcher
+> *"I save 20 links a session. By end of day I can't find the one I need."*
+
+- Heavy tab user (15–30 open at once)
+- Reads deeply on one topic at a time
+- Needs fast retrieval — searches by keyword, not hierarchy
+- **Primary jobs:** Save quickly, find later, tag for context
+
+### P2 — The Focused Worker
+> *"I know I get distracted. I just need something to catch me before it gets bad."*
+
+- Manages multiple projects across many tabs
+- Responds well to non-intrusive reminders
+- Values workspaces to context-switch cleanly
+- **Primary jobs:** Launch project context, get nudged when drifting
+
+### P3 — The Curator
+> *"I love sharing good links. I want credit for finding things first."*
+
+- Saves bookmarks with the intent to share
+- Browses the community feed for discovery
+- Cares about author attribution
+- **Primary jobs:** Publish links, explore the public feed
+
+### P4 — The Extension-First User
+> *"I never want to leave the page I'm on just to save something."*
+
+- Installs the Chrome extension first; may never visit the web app
+- Values speed above all
+- **Primary jobs:** Save current tab, view recent saves, quick companion check
+
+---
+
+## 5. User Stories
+
+### Authentication
+| ID | As a… | I want to… | So that… |
+|---|---|---|---|
+| US-01 | Visitor | Sign in with my Replit account in one click | I don't manage another password |
+| US-02 | User | Stay signed in across sessions | I don't re-authenticate every visit |
+| US-03 | User | Sign out from any page | I can switch accounts or use a shared device |
+
+### Saving & Managing Bookmarks
+| ID | As a… | I want to… | So that… |
+|---|---|---|---|
+| US-04 | User | Save the current tab from the extension sidebar | I don't need to copy-paste the URL |
+| US-05 | User | Add tags when saving a bookmark | I can filter and find it later by topic |
+| US-06 | User | Add a personal note to a bookmark | I remember why I saved it |
+| US-07 | User | Mark a bookmark public or private | I control what the community sees |
+| US-08 | User | Edit or delete any of my bookmarks | I keep my library clean and accurate |
+| US-09 | User | Search across title, URL, note, and tags | I find any saved link within seconds |
+
+### Discovery
+| ID | As a… | I want to… | So that… |
+|---|---|---|---|
+| US-10 | Visitor | Browse the public feed without logging in | I discover good content before committing to sign up |
+| US-11 | User | See who shared a public bookmark | I can explore that person's other saves |
+| US-12 | User | Filter my library by clicking a tag | I see all bookmarks on a topic at a glance |
+
+### Workspaces
+| ID | As a… | I want to… | So that… |
+|---|---|---|---|
+| US-13 | User | Group related URLs into a named workspace | I can launch my full project context in one click |
+| US-14 | User | Launch a workspace from the extension | A new Chrome window opens with all my project tabs |
+| US-15 | User | Delete a workspace I no longer need | My companion panel stays uncluttered |
+
+### Companion & Nudges
+| ID | As a… | I want to… | So that… |
+|---|---|---|---|
+| US-16 | User | See my open tab count and session duration at a glance | I'm aware of my browsing without tracking myself manually |
+| US-17 | User | Get a nudge when I have too many tabs open | I'm reminded to close what I don't need |
+| US-18 | User | Set my own tab threshold for nudges | The alerts match my personal working style |
+| US-19 | User | Turn nudges off entirely | I'm not interrupted during deep focus |
+| US-20 | User | Pop the extension out into a floating window | I keep DHeer visible on a second screen |
+
+---
+
+## 6. Feature Requirements
+
+### Priority Key
+| Label | Meaning |
+|---|---|
+| P0 | Must-have — product does not function without it |
+| P1 | Should-have — core value proposition |
+| P2 | Nice-to-have — improves experience |
+
+---
+
+### 6.1 Authentication
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| AUTH-01 | Sign in via Replit OpenID Connect | P0 | User clicks "Sign in", is redirected to Replit, returns authenticated |
+| AUTH-02 | Persistent sessions | P0 | Refreshing the page keeps the user signed in for 7 days |
+| AUTH-03 | User profile stored | P0 | Name, email, and avatar saved to the users table on first sign-in |
+| AUTH-04 | All user APIs gated | P0 | Unauthenticated requests to protected routes return 401 |
+| AUTH-05 | Sign out | P1 | Session destroyed; user redirected to the landing page |
+
+---
+
+### 6.2 Bookmark Management
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| BM-01 | Create bookmark | P0 | URL required; title and note optional; appears in list immediately |
+| BM-02 | Edit bookmark | P1 | Any field updatable (URL, title, note, tags, visibility) |
+| BM-03 | Delete bookmark | P1 | Bookmark and tag associations removed; list updates immediately |
+| BM-04 | Bookmark list | P0 | Displays newest first; shows title, URL, tags, note preview |
+| BM-05 | Full-text search | P1 | Searches title, URL, note, and tag names via SQL ILIKE |
+| BM-06 | Tag filter | P1 | Clicking a sidebar tag narrows the list to matching bookmarks |
+| BM-07 | Public / private toggle | P1 | Default private; public bookmarks appear in the community feed |
+| BM-08 | Optimistic UI | P1 | Create / edit / delete updates UI before server confirmation |
+| BM-09 | Source tracking | P2 | Records whether saved from web or extension |
+
+---
+
+### 6.3 Tags
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| TAG-01 | Add tags on save or edit | P1 | Comma-separated input; new tag names created automatically |
+| TAG-02 | Many-to-many relationship | P0 | One bookmark can carry many tags; one tag can span many bookmarks |
+| TAG-03 | Tag list in sidebar | P1 | All user tags listed; clicking any tag filters the bookmark list |
+| TAG-04 | Badge display | P1 | Tags shown as coloured badges on each bookmark card |
+| TAG-05 | Rename tag | P2 | Name update propagates to all associated bookmarks |
+| TAG-06 | Delete tag | P2 | Tag removed; bookmarks retain all other tags |
+
+---
+
+### 6.4 Public Feed
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| PF-01 | Community page at /public | P1 | Shows all public bookmarks across all users |
+| PF-02 | Accessible without login | P1 | /public and /api/public respond without a session cookie |
+| PF-03 | Author attribution | P1 | Each card shows the saving user's display name and avatar |
+| PF-04 | Empty state | P1 | Styled message shown when no public bookmarks exist |
+| PF-05 | Bookmark count | P2 | Total public bookmark count displayed at top of feed |
+
+---
+
+### 6.5 Workspaces
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| WS-01 | Create workspace | P1 | Named group of one or more URLs; saved to DB |
+| WS-02 | Delete workspace | P1 | Removed from DB; disappears from the list |
+| WS-03 | Launch from web | P1 | Opens each URL as a new tab in the current browser window |
+| WS-04 | Launch from extension | P1 | Opens a new Chrome window with all URLs loaded simultaneously |
+| WS-05 | Inline creation form | P1 | Created via in-panel form; no native window.prompt() dialog |
+
+---
+
+### 6.6 DHeer Companion
+
+#### Session Tracking
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| CP-01 | Open tab count | P1 | Accurate count shown; updates on tab create and remove events |
+| CP-02 | Tab switch count | P1 | Increments on every tab activation event |
+| CP-03 | Session duration | P1 | Time elapsed since the extension service worker started |
+| CP-04 | Top domain | P1 | Most-visited hostname in the current session |
+| CP-05 | Real-time updates | P1 | Stats refresh on every tab switch without a manual reload |
+
+#### Nudge System
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| NU-01 | Tab overload nudge | P1 | Desktop notification fires when open tabs exceed user threshold |
+| NU-02 | Idle nudge | P1 | Notification fires after user is idle beyond the idle threshold |
+| NU-03 | In-panel nudge banner | P1 | Banner appears in side panel for 8 s alongside OS notification |
+| NU-04 | Nudge cooldown | P1 | Minimum 10 min between consecutive tab-overload notifications |
+| NU-05 | Enable / disable nudges | P1 | Global toggle saved to DB and synced to extension at runtime |
+| NU-06 | Tab count threshold | P1 | User-adjustable trigger (default: 10 tabs); controlled by a slider |
+| NU-07 | Idle threshold | P2 | Configurable idle detection window (default: 5 minutes) |
+| NU-08 | Nudge frequency | P2 | Low / Medium / High level controls notification aggressiveness |
+
+---
+
+### 6.7 Chrome Extension
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| EXT-01 | Side panel opens on icon click | P0 | Clicking toolbar icon opens the DHeer side panel |
+| EXT-02 | Auto-fill current tab | P1 | URL and title pre-populated from the active tab |
+| EXT-03 | Pop-out window | P1 | Button opens a floating popup; side panel auto-closes once |
+| EXT-04 | Dock button | P1 | Button in popup re-opens the side panel and closes the popup |
+| EXT-05 | Coexist mode | P1 | After first auto-close, user can reopen side panel alongside popup |
+| EXT-06 | Recent bookmarks | P1 | Last 5 saved bookmarks shown in the Bookmarks tab |
+| EXT-07 | Nudge settings in extension | P1 | Toggle and threshold slider in Companion tab; persists to DB |
+
+---
+
+## 7. Non-Functional Requirements
+
+| ID | Requirement | Target |
+|---|---|---|
+| NFR-01 | Optimistic UI | Bookmark mutations appear in the list before server confirmation |
+| NFR-02 | Search latency | Results visible within one render cycle of typing |
+| NFR-03 | Extension stat refresh | Companion stats update on every tab switch (under 100 ms perceived) |
+| NFR-04 | Session persistence | Sessions survive server restarts via PostgreSQL session store |
+| NFR-05 | Public feed — no auth | /public responds to unauthenticated requests |
+| NFR-06 | Nudge cooldown enforcement | No more than one tab-overload notification per 10-minute window |
+| NFR-07 | Ownership enforcement | All user-data APIs verify the requester owns the resource |
+| NFR-08 | Companion data stays local | Tab tracking lives in extension memory only — never sent to server |
+| NFR-09 | Mobile usability | Full feature set accessible on narrow screens via hamburger sidebar |
+
+---
+
+## 8. Out of Scope
+
+The following are explicitly not planned for the current milestone:
+
+| Item | Rationale |
+|---|---|
+| Firefox / Safari extension | Manifest V3 migration complexity; Chrome is the primary platform |
+| Bookmark import (browser, Pocket) | Parsing complexity; defer to a dedicated import sprint |
+| Nested folders / collections | Conflicts with the flat, tag-based mental model |
+| Collaborative workspaces | Multi-user editing introduces significant backend complexity |
+| Browser history sync | Privacy-sensitive; outside current product scope |
+| Offline mode | Requires service worker caching strategy; separate workstream |
+| Native mobile app | Web and extension cover the primary use case today |
+| Monetisation / payments | Not planned for the current milestone |
+
+---
+
+## 9. Risks & Dependencies
+
+### Risk Register
+
+| # | Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|---|
+| R1 | Replit Auth OIDC unavailable outside Replit | High | Critical | Document migration path in Engineering.md; build auth abstraction layer |
+| R2 | Chrome changes side panel API behaviour | Medium | High | Monitor Chrome release notes; isolate panel logic in background.js |
+| R3 | GITHUB_TOKEN not available in isolated build environments | High | Medium | Use GitHub API from main agent where token is accessible |
+| R4 | Service worker terminated mid-session by Chrome | Medium | Medium | Persist config to chrome.storage; re-initialise on next startup |
+| R5 | Tab overload nudges feel intrusive to users | Medium | Medium | Default threshold of 10; 10-min cooldown; easy one-click disable |
+
+### External Dependencies
+
+| Dependency | Owner | Risk if Unavailable |
+|---|---|---|
+| Replit Auth (OIDC) | Replit | Users cannot sign in |
+| Replit PostgreSQL | Replit | All data unavailable |
+| Chrome Side Panel API | Google | Extension side panel breaks |
+| chrome.idle API | Google | Idle nudges stop firing |
+| chrome.notifications API | Google | Desktop nudges stop firing |
+
+---
+
+## 10. Milestones
+
+| Milestone | Description | Status |
+|---|---|---|
+| M1 — Core MVP | Bookmark CRUD, tags, search, Replit Auth, PostgreSQL | ✅ Complete |
+| M2 — Extension v1 | Side panel, companion stats, workspace launcher | ✅ Complete |
+| M3 — Sprint 1 | All 11 sprint tasks: nudge system, public feed attribution, search ILIKE, mobile nav, pop-out window | ✅ Complete |
+| M4 — Documentation | PRD, Engineering, Features, error log in docs/ | 🔄 In Progress |
+| M5 — Auth Portability | Decouple from Replit OIDC; support generic OIDC or local auth | 📋 Planned |
+| M6 — Extension v2 | Configurable backend URL; Firefox support; bookmark import | 📋 Planned |
+
+---
+
+## 11. Appendix
+
+### A. Data Models
+
+```
+users(id, email, first_name, last_name, profile_image_url)
+sessions(sid, sess, expire)
+
+bookmarks(id, userId, url, title, note, isPublic, createdAt, updatedAt, savedFrom)
+tags(id, userId, name)
+bookmark_tags(id, bookmarkId, tagId)
+
+workspaces(id, userId, name, urls[], createdAt)
+companion_settings(id, userId, trackingEnabled, nudgesEnabled,
+                   tabCountThreshold, idleThreshold, nudgeFrequency)
+```
+
+### B. API Surface
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | /api/auth/user | Required | Current user profile |
+| GET | /api/bookmarks | Required | List bookmarks; supports ?search= and ?tag= |
+| POST | /api/bookmarks | Required | Create a bookmark |
+| PUT | /api/bookmarks/:id | Required | Update a bookmark |
+| DELETE | /api/bookmarks/:id | Required | Delete a bookmark |
+| GET | /api/tags | Required | List all user tags |
+| PATCH | /api/tags/:id | Required | Rename a tag |
+| DELETE | /api/tags/:id | Required | Delete a tag |
+| GET | /api/public | None | All public bookmarks with author attribution |
+| GET | /api/workspaces | Required | List workspaces |
+| POST | /api/workspaces | Required | Create a workspace |
+| DELETE | /api/workspaces/:id | Required | Delete a workspace |
+| GET | /api/companion/settings | Required | Get companion config |
+| PATCH | /api/companion/settings | Required | Update one or more companion settings |
+
+### C. Extension Message Protocol
+
+| Message Type | Direction | Purpose |
+|---|---|---|
+| GET_SESSION_METADATA | Panel → Background | Request current tab and session stats |
+| SESSION_METADATA_UPDATE | Background → Panel | Push live stats on every tab switch |
+| UPDATE_CONFIG | Panel → Background | Sync companion settings to service worker |
+| COMPANION_NUDGE | Background → Panel | Show in-panel nudge banner for 8 seconds |
+| LAUNCH_WORKSPACE | Panel → Background | Open all workspace URLs in a new Chrome window |
+| POPUP_CREATED | Panel → Background | Notify background that popup opened; trigger side panel close |
+| OPEN_SIDEPANEL | Popup → Background | Re-open side panel and close popup |
+
+### D. Design Tokens
 
 | Token | Hex | Usage |
 |---|---|---|
-| Deep Brown | `#5e3023` | Primary actions, headers |
-| Warm Brown | `#895737` | Secondary accents |
-| Tan | `#c08552` | Borders, highlights |
-| Soft Sand | `#dab49d` | Muted text, badges |
-| Cream | `#f3e9dc` | Backgrounds, cards |
-
----
-
-## 2. User Personas
-
-| Persona | Description |
-|---|---|
-| **The Researcher** | Saves dozens of links per session; needs fast tagging and search |
-| **The Focused Worker** | Values focus nudges; uses workspaces to context-switch cleanly |
-| **The Curator** | Makes bookmarks public and enjoys browsing the community feed |
-| **The Extension User** | Saves links without leaving the current page via Chrome side panel |
-
----
-
-## 3. Functional Requirements
-
-### 3.1 Authentication
-
-| ID | Feature | Detail |
-|---|---|---|
-| AUTH-01 | Sign in via Replit OIDC | One-click login using the user's existing Replit account |
-| AUTH-02 | Persistent sessions | Sessions stored in PostgreSQL via `connect-pg-simple`; survive page reloads |
-| AUTH-03 | User profile | Stores `id`, `email`, `name`, and `profileImageUrl` |
-| AUTH-04 | Protected routes | All bookmark, tag, workspace, and companion APIs require an active session |
-| AUTH-05 | Logout | Terminates session and redirects to landing/login page |
-
----
-
-### 3.2 Bookmark Management
-
-| ID | Feature | Detail |
-|---|---|---|
-| BM-01 | Create bookmark | Save a URL with an optional title and note |
-| BM-02 | Edit bookmark | Update URL, title, note, tags, or public/private status |
-| BM-03 | Delete bookmark | Permanently remove a bookmark and its tag associations |
-| BM-04 | View bookmark list | Paginated/scrollable list sorted by creation date (newest first) |
-| BM-05 | Full-text search | Filter by title, URL, or note in real time |
-| BM-06 | Tag filter | Click a tag in the sidebar to show only bookmarks with that tag |
-| BM-07 | Public/private toggle | Each bookmark is individually public or private |
-| BM-08 | Source tracking | Records whether a bookmark was saved from `web` or `extension` |
-| BM-09 | Timestamps | `createdAt` and `updatedAt` maintained automatically |
-
-**Data model:**
-```
-bookmarks(id, userId, url, title, note, isPublic, createdAt, updatedAt, savedFrom)
-```
-
----
-
-### 3.3 Tags & Organization
-
-| ID | Feature | Detail |
-|---|---|---|
-| TAG-01 | Add tags on save | Tags entered when creating or editing a bookmark |
-| TAG-02 | Auto-create tags | New tag names are created on the fly; no separate tag-creation step |
-| TAG-03 | Many-to-many | One bookmark can have multiple tags; one tag can span many bookmarks |
-| TAG-04 | Sidebar tag list | All user tags listed in the left sidebar for quick filtering |
-| TAG-05 | Rename tag | Update a tag name; change propagates to all associated bookmarks |
-| TAG-06 | Delete tag | Remove a tag; bookmarks remain but lose that association |
-| TAG-07 | Badge display | Tags shown as colored badges on each bookmark card |
-
-**Data models:**
-```
-tags(id, userId, name)
-bookmark_tags(id, bookmarkId, tagId)
-```
-
----
-
-### 3.4 Public Feed
-
-| ID | Feature | Detail |
-|---|---|---|
-| PF-01 | Community page | `/public` route shows all bookmarks marked public, across all users |
-| PF-02 | No auth required | Public feed is accessible without logging in |
-| PF-03 | Attribution | Each public bookmark shows the saving user's name/avatar |
-
----
-
-### 3.5 Workspaces
-
-Workspaces let users group related URLs and launch them all at once.
-
-| ID | Feature | Detail |
-|---|---|---|
-| WS-01 | Create workspace | Named collection of one or more URLs |
-| WS-02 | Delete workspace | Permanently removes the workspace (URLs are not bookmarks) |
-| WS-03 | Launch workspace (web) | Opens every URL in the workspace as new browser tabs |
-| WS-04 | Launch workspace (extension) | Opens a new Chrome window with all workspace URLs loaded simultaneously |
-| WS-05 | Persistence | Workspaces stored in PostgreSQL as a `jsonb` URL array |
-
-**Data model:**
-```
-workspaces(id, userId, name, urls[], createdAt)
-```
-
----
-
-### 3.6 DHeer Companion
-
-The Companion is a virtual deer mascot living in the sidebar and Chrome extension. It observes browsing behavior locally and provides optional nudges.
-
-#### 3.6.1 Productivity Tracking (Extension — background.js)
-
-| ID | Feature | Detail |
-|---|---|---|
-| CP-01 | Tab count tracking | Counts all open Chrome tabs in real time; updated on create/remove/update events |
-| CP-02 | Tab switch counting | Increments a switch counter every time the active tab changes |
-| CP-03 | Domain frequency | Tracks how often each domain is visited in the current session |
-| CP-04 | Session timer | Records session start time to calculate session duration |
-| CP-05 | Idle detection | Uses Chrome's `idle` API to detect when the user stops interacting |
-| CP-06 | Real-time broadcast | Broadcasts `SESSION_METADATA_UPDATE` to the side panel on every tab switch |
-
-#### 3.6.2 Nudges
-
-| ID | Feature | Detail |
-|---|---|---|
-| NU-01 | Tab overload alert | Chrome notification fires when open tabs exceed the user's threshold |
-| NU-02 | Nudge cooldown | Minimum 10-minute gap between tab-overload notifications |
-| NU-03 | Idle nudge | Encourages a break or re-engagement after the user is idle |
-| NU-04 | Enable/disable nudges | User can globally toggle all nudges on or off |
-| NU-05 | Tab count threshold | User sets the tab count that triggers overload alerts (default: 10) |
-| NU-06 | Idle threshold | Configurable idle detection window (default: 300 seconds / 5 minutes) |
-| NU-07 | Nudge frequency | Three levels — Low, Medium, High — controlling notification aggressiveness |
-
-#### 3.6.3 Companion Settings
-
-Stored per user in the database and synced to the extension at runtime.
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `trackingEnabled` | boolean | `true` | Master switch for all companion tracking |
-| `nudgesEnabled` | boolean | `true` | Master switch for all nudge notifications |
-| `tabCountThreshold` | integer | `10` | Open-tab count that triggers an overload nudge |
-| `idleThreshold` | integer | `300` | Seconds of inactivity before idle nudge |
-| `nudgeFrequency` | string | `"medium"` | Nudge aggressiveness: `low`, `medium`, `high` |
-
-**Data model:**
-```
-companion_settings(id, userId, trackingEnabled, nudgesEnabled, tabCountThreshold, idleThreshold, nudgeFrequency)
-```
-
----
-
-## 4. Chrome Extension
-
-### 4.1 Manifest V3 Architecture
-
-| Component | File | Purpose |
-|---|---|---|
-| Background service worker | `background.js` | Tracks tabs, runs idle detection, sends nudges |
-| Side panel UI | `sidepanel.html` + `sidepanel.js` | Dual-tab interface: Bookmarks + Companion |
-| Action icon | `assets/icon*.png` | Clicking the toolbar icon opens the side panel |
-
-### 4.2 Side Panel Features
-
-| Tab | Feature | Detail |
-|---|---|---|
-| Bookmarks | Save current tab | One-click save of the active tab's URL and title |
-| Bookmarks | Recent bookmarks | Shows the user's most recent saved links |
-| Companion | Live session stats | Tab count, tab switches, session duration — updated in real time |
-| Companion | Top domain | Most-visited domain in the current session |
-| Companion | Workspaces | Lists all workspaces with a "Launch" button each |
-| Companion | Nudge settings | Toggle nudges and adjust tab threshold inline |
-
-### 4.3 Extension ↔ Background Messaging
-
-| Message Type | Direction | Payload | Purpose |
-|---|---|---|---|
-| `GET_SESSION_METADATA` | Panel → BG | — | Request current tracking stats |
-| `SESSION_METADATA_UPDATE` | BG → Panel | `sessionMetadata` | Push live stats on each tab switch |
-| `UPDATE_CONFIG` | Panel → BG | `config` object | Sync companion settings to background |
-| `COMPANION_NUDGE` | BG → Panel | `message` string | Display a nudge in the panel UI |
-| `LAUNCH_WORKSPACE` | Panel → BG | `urls[]` | Open workspace in a new Chrome window |
-
----
-
-## 5. API Reference
-
-All API routes live under the `/api/` prefix. Protected routes require an authenticated session.
-
-### Bookmarks
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/bookmarks` | Required | List bookmarks; supports `?search=` and `?tag=` query params |
-| `POST` | `/api/bookmarks` | Required | Create a bookmark (body: `url`, `title?`, `note?`, `isPublic?`, `tags?[]`) |
-| `GET` | `/api/bookmarks/:id` | Required | Get a single bookmark by ID |
-| `PUT` | `/api/bookmarks/:id` | Required | Update a bookmark |
-| `DELETE` | `/api/bookmarks/:id` | Required | Delete a bookmark |
-
-### Tags
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/tags` | Required | List all tags for the current user |
-| `PATCH` | `/api/tags/:id` | Required | Rename a tag |
-| `DELETE` | `/api/tags/:id` | Required | Delete a tag |
-
-### Public Feed
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/public` | None | List all public bookmarks |
-
-### Workspaces
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/workspaces` | Required | List workspaces for the current user |
-| `POST` | `/api/workspaces` | Required | Create a workspace (body: `name`, `urls[]`) |
-| `DELETE` | `/api/workspaces/:id` | Required | Delete a workspace |
-
-### Companion Settings
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/companion/settings` | Required | Get companion settings for current user |
-| `PATCH` | `/api/companion/settings` | Required | Update one or more companion settings |
-
----
-
-## 6. Frontend Pages & Routes
-
-| Route | Page | Description |
-|---|---|---|
-| `/` | Home | Authenticated bookmark library with search, filter, and tag sidebar |
-| `/public` | Public Feed | Community bookmarks; accessible without login |
-| `/login` (or redirect) | Auth | Replit OIDC sign-in entry point |
-
----
-
-## 7. Key UI Components
-
-| Component | Location | Description |
-|---|---|---|
-| `Sidebar` | `client/src/components/sidebar.tsx` | Left-side navigation; tag list, mascot status, CompanionPanel trigger |
-| `BookmarkCard` | `client/src/components/bookmark-card.tsx` | Displays one bookmark with tags, action buttons, and Framer Motion animations |
-| `AddBookmarkDialog` | `client/src/components/add-bookmark-dialog.tsx` | Modal for creating/editing a bookmark; tag autocomplete |
-| `CompanionPanel` | `client/src/components/companion-panel.tsx` | Sheet panel: Insights dashboard, Workspaces manager, Nudge Settings |
-| `ShinyButton` | `client/src/components/shiny-button.tsx` | Branded CTA button with a shimmer effect |
-
----
-
-## 8. Technology Stack
-
-### Frontend
-| Layer | Technology |
-|---|---|
-| Framework | React 18 + TypeScript |
-| Routing | Wouter |
-| State / Data fetching | TanStack Query v5 |
-| Styling | Tailwind CSS + shadcn/ui (Radix UI, New York style) |
-| Animations | Framer Motion |
-| Icons | Lucide React |
-| Build tool | Vite |
-
-### Backend
-| Layer | Technology |
-|---|---|
-| Runtime | Node.js (ESM) |
-| Framework | Express |
-| Validation | Zod + drizzle-zod |
-| Authentication | Passport.js + openid-client (Replit OIDC) |
-| Session store | express-session + connect-pg-simple |
-
-### Database
-| Layer | Technology |
-|---|---|
-| Engine | PostgreSQL |
-| ORM | Drizzle ORM |
-| Migrations | Drizzle Kit (`db:push`) |
-| Schema location | `shared/schema.ts` |
-
-### Chrome Extension
-| Layer | Technology |
-|---|---|
-| Manifest | V3 |
-| Background | Service Worker (`background.js`) |
-| UI | Vanilla HTML/CSS/JS (`sidepanel.html`, `sidepanel.js`) |
-| APIs used | `chrome.tabs`, `chrome.idle`, `chrome.notifications`, `chrome.sidePanel`, `chrome.windows`, `chrome.runtime` |
-
----
-
-## 9. Data Privacy & Security
-
-| Concern | Implementation |
-|---|---|
-| Companion data is local | All tab tracking and session data lives entirely in the Chrome extension's memory — never sent to the server |
-| Auth-gated APIs | Every user-specific API endpoint validates the session before returning data |
-| Ownership checks | Bookmark read/update/delete routes verify `bookmark.userId === currentUser.id` |
-| Session secret | Stored as an environment secret (`SESSION_SECRET`); never in source code |
-| No third-party analytics | No external tracking scripts in the web app |
-
----
-
-## 10. Non-Functional Requirements
-
-| Requirement | Target |
-|---|---|
-| Real-time extension UI | Companion stats refresh on every tab switch event (< 100 ms perceived) |
-| Optimistic UI | Bookmark mutations update the UI immediately before server confirmation |
-| Search latency | Full-text search filters results within a single render cycle on the client |
-| Zero-auth public feed | `/public` and `/api/public` respond without a session |
-| Extension nudge cooldown | No more than one tab-overload notification per 10-minute window |
-
----
-
-## 11. Replit Platform Dependencies — Full Audit & Migration Guide
-
-This section catalogues every component that is tightly coupled to the Replit platform today, the risk it creates for portability, and a concrete, self-contained replacement for each one.
-
----
-
-### 11.1 Dependency Map
-
-| # | Dependency | Type | Risk | Files Affected |
-|---|---|---|---|---|
-| D1 | Replit OpenID Connect (OIDC) auth | **Critical** | App cannot authenticate users anywhere else | `server/replit_integrations/auth/replitAuth.ts` |
-| D2 | `REPL_ID` environment variable | **Critical** | Used as the OIDC client ID; missing on any non-Replit host | `server/replit_integrations/auth/replitAuth.ts` |
-| D3 | `ISSUER_URL` environment variable | **Critical** | Hard-defaults to `https://replit.com/oidc` | `server/replit_integrations/auth/replitAuth.ts` |
-| D4 | Replit-provisioned PostgreSQL (`DATABASE_URL`) | **High** | DB is managed by Replit; not portable as-is | `server/db.ts`, `drizzle.config.ts` |
-| D5 | `SESSION_SECRET` environment variable | **Medium** | Must be re-created on any new host, but is generic | `server/replit_integrations/auth/replitAuth.ts` |
-| D6 | Hardcoded Replit app URL in extension | **High** | Extension always calls the Replit-hosted backend | `extension/sidepanel.js` line 3 |
-| D7 | `@replit/vite-plugin-runtime-error-modal` | **Low** | Dev-only error overlay; adds no production value | `vite.config.ts` |
-| D8 | `@replit/vite-plugin-cartographer` | **Low** | Replit-only dev tool; guarded by `REPL_ID` check | `vite.config.ts` |
-| D9 | `@replit/vite-plugin-dev-banner` | **Low** | Replit-only dev banner; guarded by `REPL_ID` check | `vite.config.ts` |
-| D10 | `shared/models/auth.ts` table comments | **Trivial** | Comments say "mandatory for Replit Auth"; code works fine without Replit | `shared/models/auth.ts` |
-
----
-
-### 11.2 Detailed Analysis & Self-Contained Solutions
-
----
-
-#### D1 — Replit OIDC Authentication (Critical)
-
-**What it does today:**  
-The entire login flow goes through Replit's OpenID Connect provider (`https://replit.com/oidc`). Passport.js uses `openid-client` configured against Replit's discovery endpoint. Users must have a Replit account.
-
-**Problem when migrating:**  
-Replit's OIDC server is not available outside Replit. No other host can serve as the identity provider, so every non-Replit deployment has zero working authentication.
-
-**Self-contained solution — Local email/password auth:**
-
-Replace `server/replit_integrations/auth/replitAuth.ts` with a local Passport.js `LocalStrategy`:
-
-```ts
-// server/auth/localAuth.ts
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import bcrypt from "bcryptjs";
-import session from "express-session";
-import connectPg from "connect-pg-simple";
-import { db } from "../db";
-import { users } from "@shared/models/auth";
-import { eq } from "drizzle-orm";
-
-export function setupAuth(app) {
-  const PgStore = connectPg(session);
-  app.use(session({
-    secret: process.env.SESSION_SECRET!,
-    store: new PgStore({ conString: process.env.DATABASE_URL, tableName: "sessions" }),
-    resave: false,
-    saveUninitialized: false,
-    cookie: { httpOnly: true, secure: process.env.NODE_ENV === "production", maxAge: 7 * 24 * 60 * 60 * 1000 }
-  }));
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  passport.use(new LocalStrategy({ usernameField: "email" }, async (email, password, done) => {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    if (!user || !user.passwordHash) return done(null, false);
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    return valid ? done(null, user) : done(null, false);
-  }));
-
-  passport.serializeUser((user: any, cb) => cb(null, user.id));
-  passport.deserializeUser(async (id: string, cb) => {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    cb(null, user ?? false);
-  });
-
-  // Register: POST /api/register  { email, password, name }
-  // Login:    POST /api/login      { email, password }
-  // Logout:   GET  /api/logout
-}
-```
-
-Add `passwordHash varchar` to the `users` table in `shared/models/auth.ts`.  
-Add `bcryptjs` and `passport-local` to package dependencies.  
-Remove `openid-client` and `memoizee` from dependencies.
-
-**Alternative — Third-party OIDC (zero lock-in):**  
-Replace `ISSUER_URL` and `REPL_ID` with any standard OIDC provider:
-
-| Provider | `ISSUER_URL` | Notes |
-|---|---|---|
-| Auth0 | `https://<tenant>.auth0.com` | Free tier available |
-| Google | `https://accounts.google.com` | OAuth 2.0 OIDC-compatible |
-| Keycloak (self-hosted) | `https://your-host/realms/<realm>` | Fully self-hosted, no vendor lock |
-| Clerk | `https://<app>.clerk.accounts.dev` | Dev-friendly; has its own SDK |
-
-The existing `openid-client` code already supports any OIDC-compliant issuer. Only the two environment variables need changing — no code changes required for this path.
-
----
-
-#### D2 & D3 — `REPL_ID` and `ISSUER_URL` Environment Variables (Critical)
-
-**What they do today:**
-- `REPL_ID` is passed as the OIDC `client_id` to Replit's auth server.
-- `ISSUER_URL` defaults to `https://replit.com/oidc` if not set.
-
-**Problem when migrating:**  
-`REPL_ID` only exists on Replit infrastructure. On any other host it is undefined, crashing the OIDC client setup.
-
-**Self-contained solution:**
-
-Rename these to generic variables and add validation:
-
-```ts
-// In auth setup, replace:
-process.env.REPL_ID!
-// With:
-process.env.OIDC_CLIENT_ID!
-
-// Replace the default:
-process.env.ISSUER_URL ?? "https://replit.com/oidc"
-// With:
-process.env.OIDC_ISSUER_URL   // No default — fail explicitly if missing
-```
-
-Required environment variables on any host:
-
-```env
-OIDC_ISSUER_URL=https://accounts.google.com   # or any OIDC provider
-OIDC_CLIENT_ID=your-client-id
-OIDC_CLIENT_SECRET=your-client-secret         # add if provider requires it
-SESSION_SECRET=any-random-32+-char-string
-DATABASE_URL=postgresql://user:pass@host/db
-```
-
----
-
-#### D4 — Replit-Provisioned PostgreSQL (High)
-
-**What it does today:**  
-The database is provisioned automatically by Replit and injected as `DATABASE_URL`. The connection string points to Replit's internal Neon PostgreSQL cluster.
-
-**Problem when migrating:**  
-The Neon cluster is tied to the Replit account. On other hosts, `DATABASE_URL` is undefined and the app crashes on startup (`server/db.ts` throws on missing variable).
-
-**Self-contained solution:**
-
-The code itself (`server/db.ts`, Drizzle ORM) is already 100% portable — it only needs a valid PostgreSQL connection string. No code changes are required. The migration steps are:
-
-1. Export existing data: `pg_dump $DATABASE_URL > dheer_backup.sql`
-2. Provision a new PostgreSQL database on any of:
-   - **Supabase** (free tier, managed)
-   - **Railway** (simple deploy + DB combo)
-   - **Render** (Postgres + web service in one dashboard)
-   - **Neon.tech** (serverless Postgres, same tech Replit uses internally)
-   - **Self-hosted** (Docker: `postgres:16-alpine`)
-3. Restore: `psql $NEW_DATABASE_URL < dheer_backup.sql`
-4. Run schema sync: `npm run db:push`
-5. Set the new `DATABASE_URL` on the new host.
-
-The `sessions` and `users` tables must exist before the app starts (they are created by `db:push` — no manual SQL needed).
-
----
-
-#### D5 — `SESSION_SECRET` Environment Variable (Medium)
-
-**What it does today:**  
-Signs and verifies session cookies. Currently set as a Replit secret.
-
-**Problem when migrating:**  
-It doesn't exist on the new host until you set it. If missing, `express-session` throws at startup.
-
-**Self-contained solution:**  
-Generate a new secret and set it as an environment variable on the new host:
-
-```bash
-# Generate a cryptographically strong secret
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-```
-
-Set `SESSION_SECRET=<output>` in your hosting provider's environment variables panel. No code changes needed.
-
-Note: Changing the secret invalidates all existing sessions (users will need to log in again). This is expected and safe.
-
----
-
-#### D6 — Hardcoded Replit App URL in Chrome Extension (High)
-
-**What it does today:**  
-`extension/sidepanel.js` line 3 contains:
-```js
-const API_BASE_URL = 'https://d-heer--hanvithsaia.replit.app';
-```
-Every API call from the extension is hard-wired to this Replit domain.
-
-**Problem when migrating:**  
-After moving to a new host, the extension continues to call the old Replit URL. It will break as soon as the Replit deployment is shut down.
-
-**Self-contained solution — Extension options page:**
-
-Add an extension options page where users set their own backend URL, saved to `chrome.storage.sync`:
-
-```js
-// extension/sidepanel.js — replace hardcoded URL with:
-let API_BASE_URL = 'https://d-heer--hanvithsaia.replit.app'; // fallback default
-
-chrome.storage.sync.get(['apiBaseUrl'], (result) => {
-  if (result.apiBaseUrl) API_BASE_URL = result.apiBaseUrl;
-});
-```
-
-```html
-<!-- extension/options.html -->
-<label>Backend URL: <input id="url" type="url" /></label>
-<button id="save">Save</button>
-<script>
-  chrome.storage.sync.get(['apiBaseUrl'], (r) => { document.getElementById('url').value = r.apiBaseUrl || ''; });
-  document.getElementById('save').onclick = () => {
-    chrome.storage.sync.set({ apiBaseUrl: document.getElementById('url').value });
-  };
-</script>
-```
-
-Add to `manifest.json`:
-```json
-"options_page": "options.html",
-"permissions": ["storage"]
-```
-
-This makes the extension work with any deployment of DHeer regardless of where it is hosted.
-
----
-
-#### D7, D8, D9 — Replit Vite Plugins (Low)
-
-**What they do today:**
-
-| Plugin | Purpose |
-|---|---|
-| `@replit/vite-plugin-runtime-error-modal` | Overlays runtime errors in the Replit browser preview during development |
-| `@replit/vite-plugin-cartographer` | Provides Replit's AI with a map of the project's component tree |
-| `@replit/vite-plugin-dev-banner` | Shows a "Running on Replit" banner in the dev preview |
-
-All three are loaded only when `process.env.REPL_ID !== undefined` (D8 and D9 are already guarded). They add zero functionality in production builds.
-
-**Problem when migrating:**  
-These packages are in `devDependencies`. If `REPL_ID` is not set, D8 and D9 are never loaded. D7 (`runtimeErrorOverlay`) is always instantiated but only activates in development — it is harmless but wastes a package install.
-
-**Self-contained solution:**
-
-Remove the three Replit plugins from `vite.config.ts` and uninstall the packages:
-
-```ts
-// vite.config.ts — simplified, no Replit plugins
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
-    },
-  },
-  root: path.resolve(import.meta.dirname, "client"),
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true,
-  },
-});
-```
-
-Packages to uninstall:
-```
-@replit/vite-plugin-runtime-error-modal
-@replit/vite-plugin-cartographer
-@replit/vite-plugin-dev-banner
-```
-
----
-
-#### D10 — `shared/models/auth.ts` Comments (Trivial)
-
-**What they do today:**  
-Comments on the `sessions` and `users` table definitions say "IMPORTANT: This table is mandatory for Replit Auth, don't drop it."
-
-**Problem when migrating:**  
-No functional impact. Misleading to future developers who have replaced Replit Auth.
-
-**Self-contained solution:**  
-Update the comments to reflect that these tables support the generic session-based auth system, not specifically Replit.
-
----
-
-### 11.3 Migration Checklist
-
-Use this checklist when moving DHeer to any non-Replit host:
-
-#### Phase 1 — Database
-- [ ] Export data: `pg_dump $DATABASE_URL > dheer_backup.sql`
-- [ ] Provision a new PostgreSQL instance (Supabase / Railway / Render / self-hosted)
-- [ ] Restore data: `psql $NEW_DATABASE_URL < dheer_backup.sql`
-- [ ] Set `DATABASE_URL` on new host
-
-#### Phase 2 — Authentication
-- [ ] **Option A (keep OIDC):** Register DHeer as an OAuth app with Google / Auth0 / Keycloak; get `client_id` and `client_secret`; set `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`; rename env vars in `replitAuth.ts`
-- [ ] **Option B (local auth):** Implement `passport-local` with email + bcrypt password; add `passwordHash` column to `users`; add `/api/register` endpoint; remove `openid-client` dependency
-
-#### Phase 3 — Session
-- [ ] Generate new `SESSION_SECRET` (`node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`)
-- [ ] Set `SESSION_SECRET` on new host
-
-#### Phase 4 — Chrome Extension
-- [ ] Add options page to extension with editable backend URL field
-- [ ] Store URL in `chrome.storage.sync`
-- [ ] Load stored URL at sidepanel startup with fallback to default
-- [ ] Publish updated extension or load unpacked with new backend URL set
-
-#### Phase 5 — Build Tooling
-- [ ] Remove `@replit/vite-plugin-*` from `vite.config.ts`
-- [ ] Uninstall the three Replit Vite packages
-- [ ] Verify `npm run build` succeeds without `REPL_ID` in environment
-
-#### Phase 6 — Comments & Docs
-- [ ] Update comments in `shared/models/auth.ts` (remove Replit-specific warnings)
-- [ ] Update `replit.md` → rename to `README.md` or keep both
-
----
-
-### 11.4 Recommended Hosting Stack (Fully Independent)
-
-| Layer | Recommended Option | Why |
-|---|---|---|
-| Web + API server | **Railway** or **Render** | One-click Node.js deploy; managed PostgreSQL included |
-| Database | **Neon.tech** or **Supabase** | Serverless Postgres; free tier; standard connection strings |
-| Authentication | **Google OAuth** (OIDC-compliant) | No vendor lock-in; uses existing `openid-client` code as-is |
-| Chrome Extension | Chrome Web Store or self-distributed `.crx` | Independent of any web host |
-| Secrets management | Host-native env vars panel | All major hosts support this natively |
-
----
-
-## 12. Future Considerations (Out of Scope for v1)
-
-- Import/export bookmarks (JSON, HTML browser format)
-- Folder/collection hierarchy beyond flat tags
-- Bookmark sorting options (by date, title, domain)
-- Shared workspaces across multiple users
-- Mobile companion app (iOS/Firefox extension)
-- AI-powered bookmark suggestions based on domain frequency
-- Weekly digest email of top browsing insights
-- Firefox extension support (WebExtension API is largely compatible)
+| Deep Brown | #5e3023 | Primary actions, headings |
+| Warm Brown | #895737 | Secondary accents |
+| Tan | #c08552 | Borders, highlights |
+| Soft Sand | #dab49d | Muted text, badges |
+| Cream | #f3e9dc | Backgrounds, cards |
