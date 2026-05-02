@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DHeer - Bookmark Manager",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A simple, modern bookmark manager that syncs with DHeer web app.",
   "permissions": [
     "sidePanel",
@@ -11,9 +11,7 @@
     "idle",
     "notifications"
   ],
-  "host_permissions": [
-    "*://*/*"
-  ],
+  "host_permissions": ["*://*/*"],
   "action": {
     "default_title": "Open DHeer Side Panel",
     "default_icon": {
@@ -30,9 +28,9 @@
     "default_path": "sidepanel.html"
   },
   "icons": {
-      "16": "assets/icon16_1767721345187.png",
-      "32": "assets/icon32_1767721345186.png",
-      "48": "assets/icon48_1767721345185.png",
-      "128": "assets/icon128_1767721345183.png"
+    "16": "assets/icon16_1767721345187.png",
+    "32": "assets/icon32_1767721345186.png",
+    "48": "assets/icon48_1767721345185.png",
+    "128": "assets/icon128_1767721345183.png"
   }
 }
