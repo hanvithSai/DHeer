@@ -120,9 +120,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnDock.classList.add('hidden');
 
     btnPopout.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'CLOSE_SIDEPANEL' });
-      const popupUrl = chrome.runtime.getURL('sidepanel.html?mode=popup');
-      chrome.windows.create({ url: popupUrl, type: 'popup', width: 420, height: 680, focused: true });
+      // Delegate everything to background.js via OPEN_POPUP:
+      //  1. background captures the active tab ID
+      //  2. creates the popup window
+      //  3. THEN disables the side panel — popup is visible before panel closes
+      //  4. onRemoved re-enables the panel if the popup is closed via OS X button
+      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
     });
   }
 

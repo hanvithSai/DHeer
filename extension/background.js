@@ -285,6 +285,44 @@ function sendNudge(message) {
   });
 }
 
+// ── Popup window tracking ─────────────────────────────────────────────────────
+
+/**
+ * popupState
+ *
+ * Tracks the floating popup window opened via the "Pop out" button.
+ *  - windowId   — Chrome window ID of the popup (null when closed)
+ *  - sourceTabId — ID of the tab whose side panel was closed to open the popup.
+ *                  Used to re-enable the correct side panel when the popup closes.
+ *
+ * Impact if changed:
+ *  - Losing `sourceTabId` means we cannot re-enable the right panel when the
+ *    user closes the popup via the OS X button (without clicking Dock)
+ */
+let popupState = { windowId: null, sourceTabId: null };
+
+/**
+ * windows.onRemoved listener
+ *
+ * Fires when any Chrome window closes.
+ * When the popup floating window is closed (by any means — X button, OS close,
+ * etc.) we automatically re-enable the side panel for the original tab so the
+ * user can open it again by clicking the extension icon.
+ *
+ * Impact if changed:
+ *  - Removing this listener means the side panel stays permanently disabled if
+ *    the user closes the popup without clicking the "Dock" button
+ */
+chrome.windows.onRemoved.addListener(windowId => {
+  if (windowId === popupState.windowId) {
+    const tabId = popupState.sourceTabId;
+    popupState = { windowId: null, sourceTabId: null };
+    if (tabId != null) {
+      chrome.sidePanel.setOptions({ tabId, enabled: true }).catch(() => {});
+    }
+  }
+});
+
 // ── Message handler ───────────────────────────────────────────────────────────
 
 /**
@@ -298,56 +336,78 @@ function sendNudge(message) {
  *  - GET_SESSION_METADATA — returns the current sessionMetadata synchronously
  *  - UPDATE_CONFIG        — merges new config values into the in-memory config
  *  - LAUNCH_WORKSPACE     — opens all URLs in a new Chrome window
- *  - CLOSE_SIDEPANEL      — disables the sidepanel on the active tab (used when
- *                           popping out to a floating window)
- *  - OPEN_SIDEPANEL       — re-enables and opens the sidepanel (used when docking)
+ *  - OPEN_POPUP           — captures the active tab ID, creates the floating popup
+ *                           window, THEN disables the side panel (correct order,
+ *                           no race condition).  Replaces the old two-message pattern.
+ *  - OPEN_SIDEPANEL       — re-enables and opens the sidepanel (used when docking
+ *                           back from the popup via the Dock button)
  *
  * ⚠️  `return true` at the end is REQUIRED.
- *     It keeps the message channel open so async callbacks (like the chrome.tabs.query
- *     callbacks in CLOSE/OPEN_SIDEPANEL) can still call sendResponse.
+ *     It keeps the message channel open so async callbacks can still call sendResponse.
  *     Without it, Chrome closes the port and sendResponse silently fails.
  *
  * Impact if changed:
  *  - Adding a new type here enables new cross-context communication patterns
  *  - Removing `return true` breaks all handlers that use callbacks (not just async)
- *  - CLOSE_SIDEPANEL / OPEN_SIDEPANEL must stay in sync with sidepanel.js's
+ *  - OPEN_POPUP / OPEN_SIDEPANEL must stay in sync with sidepanel.js's
  *    popup/dock button logic
  */
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === "GET_SESSION_METADATA") {
-    // Synchronous reply — safe even without `return true`, but kept for consistency
     sendResponse(sessionMetadata);
 
   } else if (request.type === "UPDATE_CONFIG") {
-    // Merge new settings into in-memory config (does NOT persist across restarts)
     config = { ...config, ...request.config };
 
   } else if (request.type === "LAUNCH_WORKSPACE") {
     launchWorkspace(request.urls);
 
-  } else if (request.type === "CLOSE_SIDEPANEL") {
-    // Disabling the panel on the active tab causes Chrome to close it
+  } else if (request.type === "OPEN_POPUP") {
+    /**
+     * OPEN_POPUP — reliable pop-out flow:
+     *  1. Capture the active tab ID BEFORE anything else (avoids wrong-window queries)
+     *  2. Create the floating popup window
+     *  3. Only after the window is confirmed created, disable the side panel for
+     *     the captured tab — this guarantees the popup is visible before the panel closes
+     *  4. Store window + tab IDs in popupState so onRemoved can re-enable the panel
+     */
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-      if (tabs[0]) {
-        chrome.sidePanel
-          .setOptions({ tabId: tabs[0].id, enabled: false })
-          .catch(() => {});
-      }
+      const tab = tabs[0];
+      if (!tab) return;
+
+      const popupUrl = chrome.runtime.getURL("sidepanel.html?mode=popup");
+      chrome.windows.create(
+        { url: popupUrl, type: "popup", width: 420, height: 680, focused: true },
+        newWindow => {
+          if (chrome.runtime.lastError || !newWindow) return;
+          // Store state for onRemoved cleanup
+          popupState = { windowId: newWindow.id, sourceTabId: tab.id };
+          // Disable the panel NOW — popup is already visible so UX is seamless
+          chrome.sidePanel
+            .setOptions({ tabId: tab.id, enabled: false })
+            .catch(() => {});
+        },
+      );
     });
 
   } else if (request.type === "OPEN_SIDEPANEL") {
-    // Re-enable then immediately open the sidepanel in the current active window
-    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-      if (tabs[0]) {
-        chrome.sidePanel
-          .setOptions({ tabId: tabs[0].id, enabled: true })
-          .then(() => chrome.sidePanel.open({ windowId: tabs[0].windowId }))
-          .catch(() => {});
-      }
+    /**
+     * OPEN_SIDEPANEL — dock flow:
+     *  Re-enable the side panel for the source tab and open it.
+     *  The popup's dock button calls this; onRemoved also re-enables (no-op if
+     *  dock was already clicked, since popupState is cleared on popup close).
+     */
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, tabs => {
+      const tab = tabs[0];
+      if (!tab) return;
+      chrome.sidePanel
+        .setOptions({ tabId: tab.id, enabled: true })
+        .then(() => chrome.sidePanel.open({ windowId: tab.windowId }))
+        .catch(() => {});
     });
   }
 
-  return true; // Keep the message channel open for async callbacks
+  return true;
 });
 
 // ── Workspace launcher ────────────────────────────────────────────────────────
