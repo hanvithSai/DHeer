@@ -13,10 +13,11 @@
  *  2. Popup/Dock     — toggles between sidepanel and floating window modes
  *  3. Auth check     — verifies session via /api/auth/user before showing UI
  *  4. Navigation     — tab bar switching (Bookmarks / Companion / Todos)
- *  5. Companion      — session stats + workspace list (polled every 5s)
- *  6. Todo           — full todo list with add, filter, toggle-done, delete
- *  7. Bookmark save  — saves the active tab as a bookmark via POST /api/bookmarks
- *  8. Recent list    — shows last 5 bookmarks at the bottom of the bookmark tab
+ *  5. Companion      — 4-stat insights, workspace list, nudge settings (polled every 5s)
+ *  6. Nudge banner   — shown for 8 s when COMPANION_NUDGE is received
+ *  7. Todo           — full todo list with add, filter, toggle-done, delete
+ *  8. Bookmark save  — saves the active tab as a bookmark via POST /api/bookmarks
+ *  9. Recent list    — shows last 5 bookmarks at the bottom of the bookmark tab
  *
  * Impact if this file changes:
  *  - All API_BASE_URL calls go to the production app — changing this URL
@@ -29,33 +30,15 @@
 
 /**
  * API_BASE_URL
- *
- * Base URL of the deployed DHeer web app.  All fetch calls in the extension
- * target this URL to share authentication sessions with the web app.
- *
- * Impact if changed:
- *  - Pointing to a different origin would break session cookie sharing
- *    (cookies are origin-scoped)
- *  - In development, change this to 'http://localhost:5000' and reload the extension
+ * Base URL of the deployed DHeer web app.
+ * In development change this to 'http://localhost:5000' and reload the extension.
  */
 const API_BASE_URL = 'https://d-heer--hanvithsaia.replit.app';
 
-/**
- * IS_POPUP_MODE
- *
- * True when the panel is opened as a detached popup window
- * (via chrome.windows.create with the sidepanel.html?mode=popup URL).
- * Controls whether the Popout or Dock button is shown.
- *
- * Impact if changed:
- *  - This flag drives all popup vs. sidepanel UI differences
- *  - Removing it would make the dock/popout buttons behave incorrectly
- */
+/** True when the panel is opened as a detached popup window. */
 const IS_POPUP_MODE = new URLSearchParams(window.location.search).get('mode') === 'popup';
 
 // ── Element references ─────────────────────────────────────────────────────────
-// These are cached once at module load time.
-// If any element ID in sidepanel.html changes, the matching reference here must be updated.
 const userDisplay  = document.getElementById('user-display');
 const titleInput   = document.getElementById('title');
 const urlInput     = document.getElementById('url');
@@ -72,17 +55,8 @@ const recentList   = document.getElementById('recent-list');
 
 /**
  * populateTabFields
- *
- * Fills the URL and title inputs from a Chrome Tab object.
- * Only overwrites the field if the user hasn't manually edited it
- * (tracked via `dataset.userEdited`).  This prevents overwriting
- * the user's typed content when they switch tabs in the background.
- *
- * @param tab — Chrome Tab object (may be undefined if no tab is active)
- *
- * Impact if changed:
- *  - Removing the `userEdited` guard would overwrite whatever the user typed
- *    every time the active tab changes
+ * Fills URL and title inputs from a Chrome Tab object.
+ * Only overwrites the field if the user hasn't manually edited it.
  */
 function populateTabFields(tab) {
   if (!tab) return;
@@ -92,13 +66,7 @@ function populateTabFields(tab) {
 
 /**
  * syncActiveTab
- *
- * Queries the currently active tab in the current window and calls
- * `populateTabFields` to pre-fill the save form.
- * Called once on DOMContentLoaded so the form is ready immediately.
- *
- * Impact if changed:
- *  - Removing this call means the form starts blank and requires manual URL entry
+ * Queries the currently active tab and pre-fills the save form.
  */
 async function syncActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -109,22 +77,9 @@ async function syncActiveTab() {
 
 document.addEventListener('DOMContentLoaded', async () => {
 
-  // Pre-fill form with the current tab
   await syncActiveTab();
 
-  // ── Input tracking ─────────────────────────────────────────────────────────
-
-  /**
-   * userEdited tracking
-   *
-   * When the user types in the URL or title fields, mark them as manually edited
-   * so `populateTabFields` won't overwrite them on the next tab switch.
-   * The flag is cleared on each save so the next tab switch auto-fills again.
-   *
-   * Impact if changed:
-   *  - Removing these listeners causes the form to auto-reset to the active tab
-   *    URL mid-edit, losing the user's input
-   */
+  // ── Input tracking ─────────────────────────────────────────────────────
   urlInput.addEventListener('input',   () => { urlInput.dataset.userEdited   = 'true'; });
   titleInput.addEventListener('input', () => { titleInput.dataset.userEdited = 'true'; });
 
@@ -133,7 +88,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     delete titleInput.dataset.userEdited;
   });
 
-  // Re-fill when the user switches tabs
   chrome.tabs.onActivated.addListener(async (activeInfo) => {
     delete urlInput.dataset.userEdited;
     delete titleInput.dataset.userEdited;
@@ -141,34 +95,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateTabFields(tab);
   });
 
-  // Re-fill when the active tab navigates to a new URL
   chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete') {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (activeTab && activeTab.id === tabId) {
-        populateTabFields(tab);
-      }
+      if (activeTab && activeTab.id === tabId) populateTabFields(tab);
     }
   });
 
-  // ── Popup / Dock toggle ────────────────────────────────────────────────────
-
-  /**
-   * Popup / Dock button setup
-   *
-   * If IS_POPUP_MODE:
-   *  - Show the "Dock" button which sends OPEN_SIDEPANEL to background.js
-   *    (background re-enables and opens the sidepanel) then closes this popup.
-   * If sidepanel mode:
-   *  - Show the "Popout" button which:
-   *    1. Sends CLOSE_SIDEPANEL to background.js (disables the sidepanel on the active tab)
-   *    2. Opens sidepanel.html?mode=popup as a standalone Chrome popup window
-   *
-   * Impact if changed:
-   *  - Changing 'OPEN_SIDEPANEL' or 'CLOSE_SIDEPANEL' message types must match
-   *    background.js's onMessage handler switch cases
-   *  - The popup dimensions (420×680) should match the sidepanel width for consistent UX
-   */
+  // ── Popup / Dock toggle ────────────────────────────────────────────────
   const btnPopout = document.getElementById('btn-popout');
   const btnDock   = document.getElementById('btn-dock');
 
@@ -192,36 +126,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ── Auth check ─────────────────────────────────────────────────────────────
-  /**
-   * checkAuth is called here to decide whether to show the login prompt
-   * or the main content.  It is defined below (hoisted as a function declaration).
-   */
+  // ── Auth check ─────────────────────────────────────────────────────────
   checkAuth();
 
-  // ── Section navigation ─────────────────────────────────────────────────────
-
+  // ── Nudge banner close button ─────────────────────────────────────────
   /**
-   * showSection
-   *
-   * Hides all main content sections and shows only the target section.
-   * Also updates the active state of the navigation tab buttons.
-   *
-   * @param sectionId — One of: 'bookmark-section' | 'companion-section' | 'todo-section'
-   *
-   * Impact if changed:
-   *  - Adding a new section requires adding its ID to `ALL_SECTIONS` and mapping
-   *    it in `sectionToNav`
-   *  - The section IDs must match the `id` attributes in sidepanel.html
+   * Dismisses the nudge banner immediately when the × button is clicked.
+   * Auto-dismiss is handled by the COMPANION_NUDGE message handler below.
    */
-  const ALL_SECTIONS = ['bookmark-section', 'companion-section', 'todo-section'];
-  const showSection = (sectionId) => {
-    ALL_SECTIONS.forEach(id => {
-      document.getElementById(id).classList.add('hidden');
+  const nudgeBannerClose = document.getElementById('nudge-banner-close');
+  if (nudgeBannerClose) {
+    nudgeBannerClose.addEventListener('click', () => {
+      document.getElementById('nudge-banner')?.classList.add('hidden');
+      clearTimeout(window._nudgeBannerTimer);
     });
+  }
+
+  // ── Section navigation ─────────────────────────────────────────────────
+  const ALL_SECTIONS = ['bookmark-section', 'companion-section', 'todo-section'];
+
+  const showSection = (sectionId) => {
+    ALL_SECTIONS.forEach(id => document.getElementById(id).classList.add('hidden'));
     document.getElementById(sectionId).classList.remove('hidden');
 
-    // Sync active tab button styling
     ['nav-bookmark', 'nav-companion', 'nav-todo'].forEach(id => {
       document.getElementById(id).classList.remove('active');
     });
@@ -235,59 +162,74 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   document.getElementById('nav-bookmark').addEventListener('click', () => showSection('bookmark-section'));
+
   document.getElementById('nav-companion').addEventListener('click', () => {
     showSection('companion-section');
-    fetchCompanionData(); // Refresh companion data on tab switch
-  });
-  document.getElementById('nav-todo').addEventListener('click', () => {
-    showSection('todo-section');
-    loadTodos(); // Refresh todo list on tab switch
+    fetchCompanionData();    // Refresh live stats
+    loadNudgeSettings();     // Sync toggle + slider with DB values
   });
 
-  // ── Companion section ──────────────────────────────────────────────────────
+  document.getElementById('nav-todo').addEventListener('click', () => {
+    showSection('todo-section');
+    loadTodos();
+  });
+
+  // ── Companion section ──────────────────────────────────────────────────
 
   /**
    * updateDisplay
    *
-   * Updates the companion Insights card (tab count, tab switches) with
-   * data received from the background worker's session metadata.
+   * Updates the 4-cell Insights grid with data from background.js:
+   *  - Tab count
+   *  - Tab switches
+   *  - Session duration (calculated from sessionStartTime)
+   *  - Top domain (highest-count key in domainFrequency)
    *
-   * @param data — Session metadata object from background.js `sessionMetadata`
-   *
-   * Impact if changed:
-   *  - If the DOM element IDs change in sidepanel.html, these updates silently fail
-   *  - The format (plain integer) is intentional — no formatting for brevity
+   * @param data — Session metadata object from background.js sessionMetadata
    */
   const updateDisplay = (data) => {
     if (!data) return;
+
     const tabCountEl    = document.getElementById('ext-tab-count');
     const tabSwitchesEl = document.getElementById('ext-tab-switches');
-    if (tabCountEl)    tabCountEl.innerText    = data.tabCount    || 0;
-    if (tabSwitchesEl) tabSwitchesEl.innerText = data.tabSwitches || 0;
+    const durationEl    = document.getElementById('ext-session-duration');
+    const topDomainEl   = document.getElementById('ext-top-domain');
+
+    if (tabCountEl)    tabCountEl.innerText    = data.tabCount    ?? 0;
+    if (tabSwitchesEl) tabSwitchesEl.innerText = data.tabSwitches ?? 0;
+
+    // Session duration
+    if (durationEl) {
+      if (data.sessionStartTime) {
+        const mins = Math.floor((Date.now() - data.sessionStartTime) / 60000);
+        durationEl.innerText = mins >= 60
+          ? `${Math.floor(mins / 60)}h ${mins % 60}m`
+          : `${mins}m`;
+      } else {
+        durationEl.innerText = '--';
+      }
+    }
+
+    // Top domain by frequency
+    if (topDomainEl) {
+      const freq    = data.domainFrequency || {};
+      const entries = Object.entries(freq).sort(([, a], [, b]) => b - a);
+      const top     = entries[0]?.[0];
+      topDomainEl.innerText = top ? top.replace('www.', '') : '--';
+    }
   };
 
   /**
    * fetchCompanionData
    *
-   * Fetches both session metadata (from background.js) and workspace list
-   * (from the API) and updates the companion section UI.
-   *
-   * Called:
-   *  - When the companion tab is clicked (via showSection listener)
-   *  - Every 5 seconds via setInterval for real-time updates
-   *  - Once immediately at startup
-   *
-   * Impact if changed:
-   *  - Removing the workspace fetch means workspaces never appear in the extension
-   *  - The 5-second poll interval matches companion-panel.tsx's poll interval for consistency
+   * Fetches session metadata from background.js and workspace list from the API.
+   * Called on companion tab switch and every 5 seconds.
    */
   const fetchCompanionData = async () => {
-    // Session metadata via chrome.runtime message (synchronous callback pattern)
     chrome.runtime.sendMessage({ type: 'GET_SESSION_METADATA' }, (data) => {
       updateDisplay(data);
     });
 
-    // Workspace list from the web app API
     try {
       const res = await fetch(`${API_BASE_URL}/api/workspaces`, { credentials: 'include' });
       if (res.ok) {
@@ -300,19 +242,103 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   /**
-   * SESSION_METADATA_UPDATE listener
+   * loadNudgeSettings
    *
-   * Listens for real-time broadcasts from background.js's `tabs.onActivated`
-   * handler.  Each tab switch triggers a broadcast so the Insights card
-   * updates immediately without waiting for the 5-second poll.
+   * Fetches companion settings from the API and populates the nudge-settings UI:
+   *  - ext-nudges-enabled checkbox
+   *  - ext-threshold-slider + ext-threshold-label
    *
-   * Impact if changed:
-   *  - Removing this listener means the card only updates on the 5-second poll
-   *  - The message type 'SESSION_METADATA_UPDATE' must match background.js
+   * Called when the companion tab is opened to keep the UI in sync with the DB.
+   */
+  async function loadNudgeSettings() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/companion/settings`, { credentials: 'include' });
+      if (!res.ok) return;
+      const settings = await res.json();
+
+      const nudgesToggle     = document.getElementById('ext-nudges-enabled');
+      const thresholdSlider  = document.getElementById('ext-threshold-slider');
+      const thresholdLabel   = document.getElementById('ext-threshold-label');
+
+      if (nudgesToggle)    nudgesToggle.checked = settings.nudgesEnabled !== false;
+      if (thresholdSlider && thresholdLabel) {
+        const val = settings.tabCountThreshold ?? 10;
+        thresholdSlider.value    = val;
+        thresholdLabel.innerText = val;
+      }
+    } catch (err) {
+      console.error('Failed to load nudge settings:', err);
+    }
+  }
+
+  /**
+   * saveCompanionSetting
+   * PATCHes a partial companion settings update and forwards it to background.js.
+   *
+   * @param updates — Partial settings object (e.g. { nudgesEnabled: false })
+   */
+  async function saveCompanionSetting(updates) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/companion/settings`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(updates),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        // Forward to background.js so in-memory config stays in sync
+        chrome.runtime.sendMessage({ type: 'UPDATE_CONFIG', config: updates });
+      }
+    } catch (err) {
+      console.error('Failed to save companion setting:', err);
+    }
+  }
+
+  // ── Nudge settings event listeners ───────────────────────────────────────
+
+  /** Enable / disable nudges toggle */
+  const nudgesToggle = document.getElementById('ext-nudges-enabled');
+  if (nudgesToggle) {
+    nudgesToggle.addEventListener('change', () => {
+      saveCompanionSetting({ nudgesEnabled: nudgesToggle.checked });
+    });
+  }
+
+  /** Tab threshold slider — live label update + debounced save */
+  const thresholdSlider = document.getElementById('ext-threshold-slider');
+  const thresholdLabel  = document.getElementById('ext-threshold-label');
+  if (thresholdSlider && thresholdLabel) {
+    // Update label in real time as the slider moves
+    thresholdSlider.addEventListener('input', () => {
+      thresholdLabel.innerText = thresholdSlider.value;
+    });
+    // Persist to DB only when the user releases the slider
+    thresholdSlider.addEventListener('change', () => {
+      saveCompanionSetting({ tabCountThreshold: parseInt(thresholdSlider.value, 10) });
+    });
+  }
+
+  /**
+   * Real-time session metadata listener
+   *
+   * background.js broadcasts SESSION_METADATA_UPDATE on every tab switch
+   * so the Insights grid updates immediately without waiting for the 5-second poll.
+   *
+   * COMPANION_NUDGE is broadcast when a nudge fires (tab overload or idle).
+   * It is displayed in the nudge banner for 8 seconds, then auto-dismissed.
    */
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'SESSION_METADATA_UPDATE') {
       updateDisplay(message.data);
+    } else if (message.type === 'COMPANION_NUDGE') {
+      const banner    = document.getElementById('nudge-banner');
+      const bannerTxt = document.getElementById('nudge-banner-text');
+      if (banner && bannerTxt) {
+        bannerTxt.innerText = message.message || 'DHeer says: check in with yourself!';
+        banner.classList.remove('hidden');
+        clearTimeout(window._nudgeBannerTimer);
+        window._nudgeBannerTimer = setTimeout(() => banner.classList.add('hidden'), 8000);
+      }
     }
   });
 
@@ -320,37 +346,37 @@ document.addEventListener('DOMContentLoaded', async () => {
    * renderWorkspaces
    *
    * Renders the workspace list in the companion section.
-   * Each item is a clickable card that sends LAUNCH_WORKSPACE to background.js.
-   *
-   * @param workspaces — Array of Workspace objects from the API
-   *
-   * Impact if changed:
-   *  - XSS note: `ws.name` is injected via innerHTML — a malicious workspace name
-   *    could inject HTML.  Safe in practice since the user controls workspace names,
-   *    but consider textContent or sanitization for higher-trust scenarios.
-   *  - Clicking a workspace sends 'LAUNCH_WORKSPACE' to background.js's
-   *    `launchWorkspace(urls)` function which calls `chrome.windows.create`
+   * Each item sends LAUNCH_WORKSPACE to background.js on click.
    */
   function renderWorkspaces(workspaces) {
     const list = document.getElementById('ext-workspaces-list');
     list.innerHTML = '';
-    if (workspaces.length === 0) {
-      list.innerHTML = '<div class="text-[10px] text-[#895737] italic text-center p-4 bg-[#2a1f1b] rounded-xl">No workspaces found</div>';
+    if (!workspaces || workspaces.length === 0) {
+      list.innerHTML = '<div style="font-size:11px; color:var(--text-muted); font-style:italic; text-align:center; padding:12px 4px; background:var(--card-bg); border-radius:10px">No workspaces yet</div>';
       return;
     }
 
     workspaces.forEach(ws => {
       const div = document.createElement('div');
-      div.className = 'bg-[#2a1f1b] p-4 rounded-xl flex items-center justify-between group hover:border-[#c08552] border border-transparent transition-all cursor-pointer';
-      div.innerHTML = `
-        <div>
-          <div class="text-sm font-bold text-[#f3e9dc]">${ws.name}</div>
-          <div class="text-[8px] text-[#895737] uppercase tracking-widest">${ws.urls.length} Resources</div>
-        </div>
-        <div class="p-2 bg-[#c08552]/10 rounded-lg text-[#c08552]">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        </div>
-      `;
+      div.className = 'workspace-item';
+      // ws.name is user-controlled content — we use textContent to avoid XSS
+      const nameEl = document.createElement('div');
+      const labelEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:13px; font-weight:700; color:var(--text)';
+      labelEl.style.cssText = 'font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.1em; margin-top:2px';
+      nameEl.textContent  = ws.name;
+      labelEl.textContent = `${ws.urls.length} Resource${ws.urls.length !== 1 ? 's' : ''}`;
+
+      const textWrap = document.createElement('div');
+      textWrap.appendChild(nameEl);
+      textWrap.appendChild(labelEl);
+
+      const iconWrap = document.createElement('div');
+      iconWrap.style.cssText = 'padding:8px; background:rgba(192,133,82,0.1); border-radius:8px; color:var(--primary); flex-shrink:0';
+      iconWrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+
+      div.appendChild(textWrap);
+      div.appendChild(iconWrap);
       div.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: 'LAUNCH_WORKSPACE', urls: ws.urls });
       });
@@ -362,40 +388,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   setInterval(fetchCompanionData, 5000);
   fetchCompanionData();
 
-  // ── Todo section ───────────────────────────────────────────────────────────
+  // ── Todo section ───────────────────────────────────────────────────────
 
-  /**
-   * window._dheerTodoFilter
-   *
-   * Global priority filter for the todo list.  Set to 'all' initially.
-   * Updated by priority filter buttons.  Stored on `window` because the
-   * filter buttons' click handlers and `renderTodos` are in different
-   * scopes — window acts as the bridge.
-   *
-   * Possible values: 'all' | 'high' | 'medium' | 'low'
-   *
-   * Impact if changed:
-   *  - Adding more filter values requires matching buttons in sidepanel.html
-   *    and handling them in `renderTodos`'s filter clause
-   */
   window._dheerTodoFilter = 'all';
 
-  /**
-   * Priority filter button listeners
-   *
-   * Each `.todo-priority-btn` in sidepanel.html has a `data-filter` attribute
-   * set to 'all' | 'high' | 'medium' | 'low'.
-   * On click:
-   *  1. Updates `window._dheerTodoFilter`
-   *  2. Resets all button styles then adds the active class for the clicked button
-   *  3. Re-renders the todo list with the new filter applied
-   *
-   * Impact if changed:
-   *  - The active class name ('active-all', 'active-high', etc.) must be
-   *    defined in sidepanel.html's `<style>` block for visual feedback
-   *  - `renderTodos` reads `window._dheerTodos` and `window._dheerStatuses`
-   *    as the data source (set by `loadTodos`)
-   */
   document.querySelectorAll('.todo-priority-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       window._dheerTodoFilter = btn.dataset.filter;
@@ -407,30 +403,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  /**
-   * Todo add button listener
-   *
-   * Reads the add-form inputs (title, priority, statusId), POSTs to the API,
-   * clears the title input, and reloads the todo list on success.
-   *
-   * Impact if changed:
-   *  - `statusId: statusId || null` ensures unselected status is stored as null,
-   *    not 0 or empty string, which would cause a FK violation
-   *  - Missing error display: currently only console.error on failure —
-   *    adding a visible error message would improve UX
-   */
   document.getElementById('todo-add-btn').addEventListener('click', async () => {
     const title      = document.getElementById('todo-add-input').value.trim();
     if (!title) return;
-    const priority   = document.getElementById('todo-add-priority').value;
+    const priority    = document.getElementById('todo-add-priority').value;
     const statusIdRaw = document.getElementById('todo-add-status').value;
-    const statusId   = statusIdRaw ? parseInt(statusIdRaw) : undefined;
+    const statusId    = statusIdRaw ? parseInt(statusIdRaw, 10) : undefined;
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/todos`, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, priority, statusId: statusId || null }),
+        body:    JSON.stringify({ title, priority, statusId: statusId || null }),
         credentials: 'include',
       });
       if (res.ok) {
@@ -442,33 +426,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  /**
-   * Enter key shortcut for the add-todo input
-   * Simulates a click on the add button so users can submit without reaching for the mouse.
-   *
-   * Impact if changed:
-   *  - Removing this listener only affects keyboard UX; mouse click still works
-   */
   document.getElementById('todo-add-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('todo-add-btn').click();
   });
 
-  // ── Bookmark save + login ──────────────────────────────────────────────────
-
-  /**
-   * Save bookmark button listener
-   * Delegates to `saveBookmark()` which is defined as a hoisted function declaration below.
-   */
+  // ── Bookmark save + login ──────────────────────────────────────────────
   saveBtn.addEventListener('click', saveBookmark);
 
-  /**
-   * Login link click handler
-   * Opens the main web app in a new tab so the user can authenticate.
-   * After login, the extension can use the same session cookie.
-   *
-   * Impact if changed:
-   *  - Preventing default is required to stop the anchor from navigating within the panel
-   */
   loginLink.addEventListener('click', (e) => {
     e.preventDefault();
     chrome.tabs.create({ url: `${API_BASE_URL}/` });
@@ -479,27 +443,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 /**
  * checkAuth
- *
- * Verifies the user's session by calling /api/auth/user.
- * On success: hides the login prompt, shows the main content, loads recent bookmarks.
- * On failure (401 or network error): shows the login prompt.
- *
- * Called once from DOMContentLoaded.
- *
- * Impact if changed:
- *  - The `user.firstName || user.email` display name fallback handles users who
- *    signed up without a full name (common with email-only providers)
- *  - `authCheck.style.display` and `mainContent.style.display` are used alongside
- *    `classList` to ensure compatibility across CSS specificity rules in the extension
+ * Verifies session via /api/auth/user.
+ * On success: hides login prompt, shows main content, loads recent bookmarks.
+ * On failure: shows login prompt.
  */
 async function checkAuth() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/user`, { credentials: 'include' });
     if (res.ok) {
       const user = await res.json();
-      if (userDisplay) {
-        userDisplay.innerText = user.firstName || user.email;
-      }
+      if (userDisplay) userDisplay.innerText = user.firstName || user.email || 'DHeer User';
       authCheck.style.display = 'none';
       mainContent.style.display = 'block';
       authCheck.classList.add('hidden');
@@ -514,16 +467,6 @@ async function checkAuth() {
   }
 }
 
-/**
- * showLogin
- *
- * Reveals the authentication prompt and hides the main content.
- * Called when the session is absent or the auth check fails.
- *
- * Impact if changed:
- *  - Both `style.display` and `classList` are set to handle any possible initial state
- *  - Removing the `flex` display on authCheck would break its centering layout
- */
 function showLogin() {
   authCheck.style.display = 'flex';
   mainContent.style.display = 'none';
@@ -535,73 +478,65 @@ function showLogin() {
 
 /**
  * saveBookmark
- *
- * Reads the save form and POSTs a new bookmark to the web app API.
- * While saving:
- *  - Disables the button and changes its text to "Saving..."
- *  - Clears status message
- * On success:
- *  - Shows a green "✓ Saved" message for 2 seconds
- *  - Clears tags and note fields (URL/title are kept for re-saving with edits)
- *  - Reloads the recent bookmarks list
- * On failure:
- *  - Shows the error message in red
- *  - Re-enables the button immediately
- *
- * `savedFrom: 'extension'` is included in the payload so the server can tag
- * this bookmark as coming from the browser extension (useful for analytics).
- *
- * Impact if changed:
- *  - The `if (saveBtn.disabled) return` guard prevents double-submission
- *  - Removing the `savedFrom` field requires removing it from the server schema too
+ * Reads the save form and POSTs a new bookmark.
+ * Shows status feedback and reloads the recent bookmarks list on success.
  */
 async function saveBookmark() {
   if (saveBtn.disabled) return;
 
-  saveBtn.disabled = true;
-  const originalBtnText = saveBtn.innerText;
-  saveBtn.innerText = 'Saving...';
+  const url   = urlInput.value.trim();
+  const title = titleInput.value.trim();
+  const tags  = tagsInput.value.trim();
+  const note  = noteInput.value.trim();
+
+  if (!url) {
+    statusMsg.style.color = '#f87171';
+    statusMsg.innerText   = '⚠ Please enter a URL';
+    return;
+  }
+
+  saveBtn.disabled   = true;
+  saveBtn.innerText  = 'Saving...';
   statusMsg.innerText = '';
 
-  const data = {
-    url:       urlInput.value,
-    title:     titleInput.value,
-    note:      noteInput.value,
-    tags:      tagsInput.value.split(',').map(t => t.trim()).filter(Boolean),
-    savedFrom: 'extension',
-  };
-
   try {
+    const tagList = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
     const res = await fetch(`${API_BASE_URL}/api/bookmarks`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(data),
+      body:    JSON.stringify({
+        url,
+        title:     title || url,
+        note:      note  || undefined,
+        tags:      tagList,
+        isPublic:  false,
+        savedFrom: 'extension',
+      }),
       credentials: 'include',
     });
 
     if (res.ok) {
-      statusMsg.innerText = '✓ Saved Successfully';
-      statusMsg.style.color = '#895737';
-
+      statusMsg.style.color = '#4ade80';
+      statusMsg.innerText   = '✓ Saved!';
       tagsInput.value = '';
       noteInput.value = '';
-
-      setTimeout(() => {
-        statusMsg.innerText = '';
-        saveBtn.innerText = originalBtnText;
-        saveBtn.disabled = false;
-      }, 2000);
-
-      loadRecentBookmarks();
+      delete urlInput.dataset.userEdited;
+      delete titleInput.dataset.userEdited;
+      await loadRecentBookmarks();
+      setTimeout(() => { statusMsg.innerText = ''; }, 2000);
     } else {
-      const err = await res.json();
-      throw new Error(err.message || 'Failed to save');
+      const err = await res.json().catch(() => ({}));
+      statusMsg.style.color = '#f87171';
+      statusMsg.innerText   = err.message || `Error ${res.status}`;
     }
-  } catch (error) {
-    statusMsg.innerText = '✕ ' + error.message;
-    statusMsg.style.color = '#ef4444';
-    saveBtn.innerText = originalBtnText;
-    saveBtn.disabled = false;
+  } catch (err) {
+    console.error('Save error', err);
+    statusMsg.style.color = '#f87171';
+    statusMsg.innerText   = 'Network error — check your connection';
+  } finally {
+    saveBtn.disabled  = false;
+    saveBtn.innerText = 'Save to DHeer';
   }
 }
 
@@ -609,127 +544,76 @@ async function saveBookmark() {
 
 /**
  * loadRecentBookmarks
- *
- * Fetches the user's bookmark list and renders the 5 most recently created
- * ones in the "recent" section at the bottom of the bookmark tab.
- *
- * Impact if changed:
- *  - `slice(0, 5)` limits to 5 items — change this to show more/fewer recent bookmarks
- *  - This function is also called after a successful save to immediately show
- *    the newly saved bookmark at the top of the list
+ * Fetches the 5 most recent bookmarks and renders them in the recent list.
  */
 async function loadRecentBookmarks() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/bookmarks`, { credentials: 'include' });
-    if (res.ok) {
-      const bookmarks = await res.json();
-      renderRecent(bookmarks.slice(0, 5));
+    if (!res.ok) return;
+
+    const bookmarks = await res.json();
+    const recent    = bookmarks.slice(0, 5);
+    recentList.innerHTML = '';
+
+    if (recent.length === 0) {
+      recentList.innerHTML = '<div style="font-size:12px; color:var(--text-muted); font-style:italic">No bookmarks saved yet</div>';
+      return;
     }
+
+    recent.forEach(bm => {
+      const div = document.createElement('div');
+      div.style.cssText = 'background:var(--card-bg); border-radius:10px; padding:10px 12px; cursor:pointer; border:1px solid transparent;';
+      div.addEventListener('mouseenter', () => div.style.borderColor = 'var(--primary)');
+      div.addEventListener('mouseleave', () => div.style.borderColor = 'transparent');
+
+      // Use textContent for user-controlled data to prevent XSS
+      const titleEl  = document.createElement('div');
+      const domainEl = document.createElement('div');
+      titleEl.style.cssText  = 'font-size:12px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px';
+      domainEl.style.cssText = 'font-size:10px; color:var(--text-muted)';
+      titleEl.textContent    = bm.title || bm.url;
+      try { domainEl.textContent = new URL(bm.url).hostname.replace('www.', ''); } catch { domainEl.textContent = bm.url; }
+
+      div.appendChild(titleEl);
+      div.appendChild(domainEl);
+      div.addEventListener('click', () => chrome.tabs.create({ url: bm.url }));
+      recentList.appendChild(div);
+    });
   } catch (err) {
-    console.error('Failed to load recents', err);
+    console.error('Failed to load recent bookmarks', err);
   }
 }
 
-/**
- * renderRecent
- *
- * Renders a list of bookmark items into the `recentList` container.
- * Each item shows the title (or URL if no title) and the domain name.
- * Clicking an item opens the URL in a new tab.
- *
- * @param bookmarks — Array of BookmarkResponse objects (title, url, tags, etc.)
- *
- * Impact if changed:
- *  - `new URL(b.url).hostname` can throw on invalid URLs — the try/catch fallback
- *    shows the raw URL instead, preventing a crash
- *  - XSS note: `.innerText` is used for title/domain — no HTML injection risk
- */
-function renderRecent(bookmarks) {
-  recentList.innerHTML = '';
-  if (bookmarks.length === 0) {
-    recentList.innerHTML = '<div class="empty-state">No bookmarks yet</div>';
-    return;
-  }
-
-  bookmarks.forEach(b => {
-    const div = document.createElement('div');
-    div.className = 'recent-item';
-
-    let hostname = b.url;
-    try { hostname = new URL(b.url).hostname; } catch (_e) {}
-
-    const titleEl = document.createElement('div');
-    titleEl.className = 'recent-title';
-    titleEl.textContent = b.title || b.url;
-
-    const urlEl = document.createElement('div');
-    urlEl.className = 'recent-url';
-    urlEl.textContent = hostname;
-
-    div.appendChild(titleEl);
-    div.appendChild(urlEl);
-    div.addEventListener('click', () => chrome.tabs.create({ url: b.url }));
-    recentList.appendChild(div);
-  });
-}
-
-// ── Todos ──────────────────────────────────────────────────────────────────────
-
-/**
- * PRIORITY_ORDER
- *
- * Maps priority string values to sort order numbers.
- * Used by `renderTodos` to sort the todo list by priority before rendering.
- * Lower number = displayed first.
- *
- * Impact if changed:
- *  - Adding 'urgent' would require handling it in the filter buttons and badge styles
- *  - The `?? 1` fallback in sort places unknowns at "medium" level
- */
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+// ── Todo helpers ───────────────────────────────────────────────────────────────
 
 /**
  * loadTodos
- *
- * Fetches both todos and todo-statuses from the API in parallel,
- * then:
- *  1. Populates the status dropdown in the add-form
- *  2. Renders the todo list
- *  3. Stores data in `window._dheerTodos` and `window._dheerStatuses`
- *     so priority filter re-renders can access it without a new fetch
- *
- * Called when the todo tab is activated and after any create/update/delete.
- *
- * Impact if changed:
- *  - `window._dheerTodos` / `window._dheerStatuses` are used by priority filter
- *    buttons' click handlers — removing them breaks the filter re-render
- *  - If either request fails, the function bails without updating the UI
- *    (a silent failure — consider showing an error state)
+ * Fetches statuses + todos in parallel and renders the list.
  */
 async function loadTodos() {
   try {
-    const [todosRes, statusesRes] = await Promise.all([
-      fetch(`${API_BASE_URL}/api/todos`,         { credentials: 'include' }),
+    const [statusRes, todoRes] = await Promise.all([
       fetch(`${API_BASE_URL}/api/todo-statuses`, { credentials: 'include' }),
+      fetch(`${API_BASE_URL}/api/todos`,          { credentials: 'include' }),
     ]);
-    if (!todosRes.ok || !statusesRes.ok) return;
 
-    const todos    = await todosRes.json();
-    const statuses = await statusesRes.json();
+    const statuses = statusRes.ok ? await statusRes.json() : [];
+    const todos    = todoRes.ok   ? await todoRes.json()   : [];
 
-    // Populate the status dropdown in the add form
-    const statusSelect = document.getElementById('todo-add-status');
-    statusSelect.innerHTML = '<option value="">No status</option>';
-    statuses.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = s.name;
-      statusSelect.appendChild(opt);
-    });
-
-    // Persist data for filter re-renders (accessed via window by priority filter handlers)
     window._dheerTodos    = todos;
     window._dheerStatuses = statuses;
+
+    // Populate the status select in the add form
+    const statusSelect = document.getElementById('todo-add-status');
+    if (statusSelect) {
+      statusSelect.innerHTML = '<option value="">No status</option>';
+      statuses.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value       = s.id;
+        opt.textContent = s.name;
+        statusSelect.appendChild(opt);
+      });
+    }
 
     renderTodos(todos, statuses);
   } catch (err) {
@@ -739,163 +623,102 @@ async function loadTodos() {
 
 /**
  * renderTodos
- *
- * Renders the todo list for the current priority filter.
- * Reads `window._dheerTodoFilter` to determine which priority to show.
- * Sorts the filtered list by PRIORITY_ORDER before rendering.
- *
- * For each todo item renders:
- *  - A toggle-done circle (marks as "Done" / reverts to "To Do")
- *  - Title (with optional strikethrough if done)
- *  - Priority badge
- *  - Status dot + label
- *  - Delete button
- *
- * Toggle-done logic:
- *  - "Done"   status: looks up the status named "Done" and sets statusId to it
- *  - "To Do"  status: looks up the status named "To Do" and reverts to it
- *  ⚠️  This relies on the exact status names "Done" and "To Do" existing.
- *     If those defaults are deleted or renamed, the toggle silently sets statusId to null.
- *
- * @param todos    — Array of Todo objects (may be null; falls back to window._dheerTodos)
- * @param statuses — Array of TodoStatus objects (may be null; falls back to window._dheerStatuses)
- *
- * Impact if changed:
- *  - Changing `escapeHtml` usage for non-innerHTML content is redundant but harmless
- *  - Each PATCH for toggle-done is a full round-trip — consider optimistic UI
+ * Renders the filtered todo list in #todo-list.
  */
 function renderTodos(todos, statuses) {
-  const allTodos    = todos    || window._dheerTodos    || [];
-  const allStatuses = statuses || window._dheerStatuses || [];
-  const filter      = window._dheerTodoFilter || 'all';
+  const container = document.getElementById('todo-list');
+  if (!container) return;
 
-  const filtered = filter === 'all' ? allTodos : allTodos.filter(t => t.priority === filter);
-  const sorted   = [...filtered].sort(
-    (a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1),
-  );
+  const filtered = (window._dheerTodoFilter === 'all')
+    ? todos
+    : todos.filter(t => t.priority === window._dheerTodoFilter);
 
-  const list = document.getElementById('todo-list');
-  list.innerHTML = '';
+  container.innerHTML = '';
 
-  if (sorted.length === 0) {
-    list.innerHTML = '<div style="text-align:center; padding:32px 0; color: var(--text-muted); font-size:13px;">No tasks yet — add one above!</div>';
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:32px 0; color:var(--text-muted); font-size:12px; font-style:italic">No tasks here yet</div>';
     return;
   }
 
-  sorted.forEach(todo => {
-    const status = allStatuses.find(s => s.id === todo.statusId);
-    const isDone = status && status.name === 'Done';
-    const priorityBadgeClass = `todo-priority-badge badge-${todo.priority || 'medium'}`;
+  filtered.forEach(todo => {
+    const status = statuses.find(s => s.id === todo.statusId);
+    const isDone = status?.name === 'Done';
 
-    const div = document.createElement('div');
-    div.className = 'todo-item' + (isDone ? ' done' : '');
-    div.innerHTML = `
-      <div class="todo-check ${isDone ? 'checked' : ''}" data-id="${todo.id}" data-done="${isDone}">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-      </div>
-      <div class="todo-body">
-        <div class="todo-title">${escapeHtml(todo.title)}</div>
-        <div class="todo-meta">
-          <span class="${priorityBadgeClass}">${capitalize(todo.priority || 'medium')}</span>
-          ${status ? `<span class="todo-status-dot" style="background:${status.color}"></span><span class="todo-status-label">${escapeHtml(status.name)}</span>` : ''}
-        </div>
-      </div>
-      <button class="todo-delete-btn" data-id="${todo.id}" title="Delete">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-      </button>
-    `;
+    const item = document.createElement('div');
+    item.className = `todo-item${isDone ? ' done' : ''}`;
 
-    /**
-     * Toggle-done click handler
-     *
-     * Toggles a todo between "Done" and "To Do" states by PATCHing the statusId.
-     * Reads the current done-state from `data-done` attribute set during render
-     * to avoid re-fetching just to check current status.
-     *
-     * Impact if changed:
-     *  - Relies on statuses named "Done" and "To Do" existing (seeded by default)
-     *  - `targetStatusId = null` if neither name is found — todo loses its status
-     */
-    div.querySelector('.todo-check').addEventListener('click', async (e) => {
-      const id             = parseInt(e.currentTarget.dataset.id);
-      const currentlyDone  = e.currentTarget.dataset.done === 'true';
-      const doneStatus     = allStatuses.find(s => s.name === 'Done');
-      const toDoStatus     = allStatuses.find(s => s.name === 'To Do');
-      const targetStatusId = currentlyDone ? (toDoStatus?.id ?? null) : (doneStatus?.id ?? null);
+    // Toggle-done button
+    const check = document.createElement('div');
+    check.className = `todo-check${isDone ? ' checked' : ''}`;
+    check.title = isDone ? 'Mark as To Do' : 'Mark as Done';
+    check.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+    check.addEventListener('click', async () => {
+      const doneStatus = statuses.find(s => s.name === 'Done');
+      const todoStatus = statuses.find(s => s.name === 'To Do');
+      const nextStatus = isDone ? (todoStatus ?? null) : (doneStatus ?? null);
       try {
-        await fetch(`${API_BASE_URL}/api/todos/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/todos/${todo.id}`, {
           method:  'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ statusId: targetStatusId }),
+          body:    JSON.stringify({ statusId: nextStatus?.id ?? null }),
           credentials: 'include',
         });
-        await loadTodos();
+        if (res.ok) await loadTodos();
       } catch (err) {
-        console.error('Toggle done failed', err);
+        console.error('Failed to toggle todo', err);
       }
     });
 
-    /**
-     * Delete click handler
-     *
-     * DELETEs a todo by ID.  Reloads the list on success.
-     * No confirmation dialog — deletion is immediate.
-     *
-     * Impact if changed:
-     *  - Adding a confirm() dialog would improve safety but blocks the UI
-     */
-    div.querySelector('.todo-delete-btn').addEventListener('click', async (e) => {
-      const id = parseInt(e.currentTarget.dataset.id);
+    // Body
+    const body = document.createElement('div');
+    body.className = 'todo-body';
+    const titleEl = document.createElement('div');
+    titleEl.className = 'todo-title';
+    titleEl.textContent = todo.title;
+
+    const meta = document.createElement('div');
+    meta.className = 'todo-meta';
+
+    const badge = document.createElement('span');
+    badge.className = `todo-priority-badge badge-${todo.priority || 'medium'}`;
+    badge.textContent = (todo.priority || 'medium').charAt(0).toUpperCase() + (todo.priority || 'medium').slice(1);
+
+    if (status) {
+      const dot = document.createElement('span');
+      dot.className = 'todo-status-dot';
+      dot.style.background = status.color || '#555';
+      const lbl = document.createElement('span');
+      lbl.className   = 'todo-status-label';
+      lbl.textContent = status.name;
+      meta.appendChild(dot);
+      meta.appendChild(lbl);
+    }
+    meta.prepend(badge);
+
+    body.appendChild(titleEl);
+    body.appendChild(meta);
+
+    // Delete button
+    const del = document.createElement('button');
+    del.className = 'todo-delete-btn';
+    del.title     = 'Delete';
+    del.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
       try {
-        await fetch(`${API_BASE_URL}/api/todos/${id}`, { method: 'DELETE', credentials: 'include' });
-        await loadTodos();
+        const res = await fetch(`${API_BASE_URL}/api/todos/${todo.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        if (res.ok) await loadTodos();
       } catch (err) {
-        console.error('Delete todo failed', err);
+        console.error('Failed to delete todo', err);
       }
     });
 
-    list.appendChild(div);
+    item.appendChild(check);
+    item.appendChild(body);
+    item.appendChild(del);
+    container.appendChild(item);
   });
-}
-
-// ── Utilities ──────────────────────────────────────────────────────────────────
-
-/**
- * escapeHtml
- *
- * Sanitizes a string for safe insertion into innerHTML.
- * Replaces &, <, >, and " with their HTML entity equivalents.
- *
- * @param str — Raw string to sanitize (may be null/undefined)
- * @returns    Sanitized string safe for innerHTML, or empty string if input is falsy
- *
- * Impact if changed:
- *  - Removing this function and using innerHTML with raw user data would create
- *    an XSS vulnerability — todo titles are user-controlled content
- *  - Single quotes (') are not escaped here — ensure they're not used in attribute contexts
- */
-function escapeHtml(str) {
-  if (!str) return '';
-  return str
-    .replace(/&/g,  '&amp;')
-    .replace(/</g,  '&lt;')
-    .replace(/>/g,  '&gt;')
-    .replace(/"/g,  '&quot;');
-}
-
-/**
- * capitalize
- *
- * Returns the input string with the first character uppercased.
- * Used to display priority labels ("high" → "High") in the priority badge.
- *
- * @param str — String to capitalize (may be falsy)
- * @returns    Capitalized string, or empty string if input is falsy
- *
- * Impact if changed:
- *  - Only the first character is changed; the rest are left as-is
- *  - For multi-word priorities (e.g. "very high"), only "V" would be capitalized
- */
-function capitalize(str) {
-  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }

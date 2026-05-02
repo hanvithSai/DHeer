@@ -279,7 +279,7 @@ export function TodoPanel() {
                       <TodoForm
                         data={editingTodo}
                         onChange={d => setEditingTodo({ ...editingTodo, ...d })}
-                        onSave={() => updateTodo.mutate({ id: editingTodo.id, ...editingTodo })}
+                        onSave={() => updateTodo.mutate({ ...editingTodo })}
                         onCancel={() => setEditingTodo(null)}
                         saving={updateTodo.isPending}
                       />

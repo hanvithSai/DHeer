@@ -1,115 +1,74 @@
 /**
  * client/src/components/companion-panel.tsx
  *
- * The DHeer Companion Panel — a slide-out drawer accessible by clicking
- * the mascot icon in the sidebar.
+ * DHeer Companion Panel — slides in from the left when the mascot icon is clicked.
  *
- * Features:
- *  1. Companion Insights — real-time tab count and tab-switch count from
- *     the browser extension (via chrome.runtime.sendMessage)
- *  2. Workspaces — create, launch, and delete named URL collections
- *  3. Nudge Settings — toggle mascot nudges and configure the tab threshold
+ * Sections:
+ *  1. Companion Insights  — 2×2 grid: Tabs, Switches, Session Duration, Top Domain
+ *  2. Workspaces          — create (inline form), launch, delete
+ *  3. Nudge Settings      — trackingEnabled, nudgesEnabled, tabCountThreshold,
+ *                           idleThreshold, nudgeFrequency
  *
- * This component renders inside a `<Sheet>` portal in sidebar.tsx.
- * It gracefully degrades when the extension is not installed (chrome.runtime absent).
- *
- * Impact if changed:
- *  - Changes to query keys must match server/routes.ts and storage.ts paths
- *  - The `updateSettings` mutation sends the updated config to the extension via
- *    chrome.runtime.sendMessage({ type: 'UPDATE_CONFIG', config }) — any shape
- *    change here must be mirrored in background.js's UPDATE_CONFIG handler
- *  - The workspace prompt-based creation is intentional (quick prototype UX)
+ * All settings are persisted to the DB via PATCH /api/companion/settings and
+ * simultaneously forwarded to the browser extension via chrome.runtime.sendMessage
+ * so background.js's in-memory config stays in sync.
  */
 
 import React, { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Play, Trash2, Plus, Monitor, Bell, Activity, X } from "lucide-react";
+import { Play, Trash2, Plus, Monitor, Bell, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { SheetTrigger } from "@/components/ui/sheet";
 import type { Workspace, CompanionSettings } from "@shared/schema";
 
-/**
- * CompanionPanel
- *
- * Root component for the companion side-panel.
- * Rendered inside a `<SheetContent>` in sidebar.tsx.
- *
- * State:
- *  - `sessionData` — tab count + switch count polled from the extension every 5s
- *
- * Queries:
- *  - `/api/companion/settings` — nudge settings (refreshed after PATCH)
- *  - `/api/workspaces`         — user's workspace list
- *
- * Impact if changed:
- *  - Adding a new section here requires no changes elsewhere
- *  - Removing the Settings section would leave nudge config inaccessible
- */
 export function CompanionPanel() {
   const { toast } = useToast();
 
-  /**
-   * sessionData
-   *
-   * In-memory state for browser session metadata received from the extension.
-   * Updated every 5 seconds via a polled chrome.runtime.sendMessage call.
-   * Defaults to zeros when the extension is absent or hasn't responded yet.
-   *
-   * Impact if changed:
-   *  - This is display-only; changing it doesn't affect the extension's tracking state
-   *  - Increasing the poll interval reduces CPU usage but makes the display stale longer
-   */
-  const [sessionData, setSessionData] = useState({ tabCount: 0, tabSwitches: 0 });
+  // ── Extension session state ──────────────────────────────────────────────────
+  const [sessionData, setSessionData] = useState({
+    tabCount: 0,
+    tabSwitches: 0,
+    sessionStartTime: 0,
+    domainFrequency: {} as Record<string, number>,
+  });
 
-  /**
-   * settings query
-   *
-   * Fetches companion settings (nudgesEnabled, tabCountThreshold, etc.).
-   * The server auto-creates a default row for new users so this never returns null.
-   * `staleTime: Infinity` (from queryClient defaults) means it re-fetches only
-   * after `invalidateQueries` is called by the updateSettings mutation.
-   *
-   * Impact if changed:
-   *  - The settings object drives the Switch and Slider initial values
-   *  - If this query fails, the controls render with their `?? default` fallbacks
-   */
+  // ── Workspace inline form state ──────────────────────────────────────────────
+  const [showWorkspaceForm, setShowWorkspaceForm] = useState(false);
+  const [wsName, setWsName] = useState("");
+  const [wsUrls, setWsUrls] = useState("");
+
+  // ── Computed session stats ───────────────────────────────────────────────────
+  const topDomain =
+    Object.entries(sessionData.domainFrequency)
+      .sort(([, a], [, b]) => b - a)[0]?.[0]
+      ?.replace("www.", "") ?? null;
+
+  const sessionMins = sessionData.sessionStartTime
+    ? Math.floor((Date.now() - sessionData.sessionStartTime) / 60000)
+    : 0;
+  const sessionDuration = sessionData.sessionStartTime
+    ? sessionMins >= 60
+      ? `${Math.floor(sessionMins / 60)}h ${sessionMins % 60}m`
+      : `${sessionMins}m`
+    : null;
+
+  // ── Queries ──────────────────────────────────────────────────────────────────
   const { data: settings } = useQuery<CompanionSettings>({
     queryKey: ["/api/companion/settings"],
   });
 
-  /**
-   * workspaces query
-   *
-   * Fetches the list of workspaces for the user.
-   * Re-fetches after createWorkspace or deleteWorkspace mutations succeed.
-   *
-   * Impact if changed:
-   *  - Removing this query breaks the workspace list and launch buttons
-   */
   const { data: workspaces } = useQuery<Workspace[]>({
     queryKey: ["/api/workspaces"],
   });
 
-  /**
-   * Extension metadata polling effect
-   *
-   * Sends `GET_SESSION_METADATA` to the browser extension every 5 seconds
-   * and stores the response in `sessionData` to display tab count and switches.
-   * Gracefully skips if `window.chrome.runtime` is unavailable (web-only view).
-   *
-   * Cleanup: clears the interval on unmount to prevent state updates on dead components.
-   *
-   * Impact if changed:
-   *  - The 5-second interval matches the extension's broadcast rate from background.js
-   *  - Removing this effect means the Insights card always shows "--"
-   *  - Adding a real-time listener (chrome.runtime.onMessage) would eliminate
-   *    the poll entirely, but requires the panel to always be mounted
-   */
+  // ── Extension metadata polling (every 5 s) ───────────────────────────────────
   useEffect(() => {
     const chromeObj = (window as any).chrome;
     if (!chromeObj?.runtime) return;
@@ -120,8 +79,10 @@ export function CompanionPanel() {
         (response: any) => {
           if (response) {
             setSessionData({
-              tabCount: response.tabCount || 0,
-              tabSwitches: response.tabSwitches || 0,
+              tabCount:        response.tabCount        || 0,
+              tabSwitches:     response.tabSwitches     || 0,
+              sessionStartTime: response.sessionStartTime || 0,
+              domainFrequency: response.domainFrequency || {},
             });
           }
         },
@@ -133,39 +94,13 @@ export function CompanionPanel() {
     return () => clearInterval(interval);
   }, []);
 
-  /**
-   * updateSettings mutation
-   *
-   * PATCHes one or more companion setting fields on the server.
-   * On success:
-   *  1. Parses the updated settings JSON from the response
-   *  2. Invalidates the settings query cache to re-fetch fresh data
-   *  3. Sends the new config to the extension via chrome.runtime.sendMessage
-   *     so background.js can update its in-memory `config` object immediately
-   *     without waiting for the sidepanel to re-open.
-   *
-   * ⚠️  BUG FIX: `apiRequest` returns the raw `Response` object.
-   *     We must call `.json()` before passing to the extension.
-   *     Previously, the raw Response was passed as `config`, which caused
-   *     the extension to receive an unserializable object.
-   *
-   * @param updates — Partial<CompanionSettings> (any subset of settings fields)
-   *
-   * Impact if changed:
-   *  - The extension's `config` object in background.js is updated here — if the
-   *    JSON shape changes, background.js's UPDATE_CONFIG handler must also change
-   *  - Removing the `invalidateQueries` call means the UI sliders won't reflect
-   *    the saved value until the page is reloaded
-   */
+  // ── Mutations ────────────────────────────────────────────────────────────────
   const updateSettings = useMutation({
     mutationFn: (updates: Partial<CompanionSettings>) =>
       apiRequest("PATCH", "/api/companion/settings", updates),
     onSuccess: async (response) => {
-      // Parse the JSON body from the raw Response before using it
       const newSettings = await response.json();
       queryClient.invalidateQueries({ queryKey: ["/api/companion/settings"] });
-
-      // Forward the updated config to the extension background worker
       const chromeObj = (window as any).chrome;
       if (chromeObj?.runtime) {
         chromeObj.runtime.sendMessage({ type: "UPDATE_CONFIG", config: newSettings });
@@ -173,137 +108,110 @@ export function CompanionPanel() {
     },
   });
 
-  /**
-   * createWorkspace mutation
-   *
-   * POSTs a new workspace (name + urls[]) to the server.
-   * On success: invalidates the workspaces cache and shows a toast notification.
-   *
-   * The creation UI uses `window.prompt()` — a quick prototype approach that
-   * blocks the browser tab.  Replacing with an inline form would be more
-   * accessible but requires additional state management.
-   *
-   * @param newWorkspace — { name: string, urls: string[] }
-   *
-   * Impact if changed:
-   *  - URLs are not validated before storage — any string is accepted
-   *  - The workspace appears immediately in the list after cache invalidation
-   */
   const createWorkspace = useMutation({
     mutationFn: (newWorkspace: { name: string; urls: string[] }) =>
       apiRequest("POST", "/api/workspaces", newWorkspace),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workspaces"] });
       toast({ title: "Workspace created" });
+      setShowWorkspaceForm(false);
+      setWsName("");
+      setWsUrls("");
     },
+    onError: () =>
+      toast({ title: "Failed to create workspace", variant: "destructive" }),
   });
 
-  /**
-   * deleteWorkspace mutation
-   *
-   * DELETEs a workspace by ID.  On success: invalidates the workspaces cache.
-   * No confirmation dialog — deletion is immediate.
-   *
-   * @param id — Workspace numeric PK
-   *
-   * Impact if changed:
-   *  - Adding a confirmation dialog here would improve UX but requires state
-   *  - The server enforces ownership, so deleting another user's ID silently no-ops
-   */
   const deleteWorkspace = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/workspaces/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/workspaces"] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["/api/workspaces"] }),
   });
 
-  /**
-   * launchWorkspace
-   *
-   * Launches all URLs in a workspace.
-   * If running inside the browser extension context (chrome.runtime present):
-   *   → sends LAUNCH_WORKSPACE to background.js which calls chrome.windows.create
-   * Otherwise (web-only view):
-   *   → opens each URL in a new browser tab via window.open
-   *
-   * @param urls — Array of URL strings from the workspace
-   *
-   * Impact if changed:
-   *  - Changing the message type must be mirrored in background.js onMessage handler
-   *  - window.open may be blocked by popup blockers for multiple simultaneous calls
-   */
   const launchWorkspace = (urls: string[]) => {
     const chromeObj = (window as any).chrome;
     if (chromeObj?.runtime) {
       chromeObj.runtime.sendMessage({ type: "LAUNCH_WORKSPACE", urls });
     } else {
-      urls.forEach(url => window.open(url, "_blank"));
+      urls.forEach((url) => window.open(url, "_blank"));
     }
     toast({ title: "Launching workspace..." });
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const handleCreateWorkspace = () => {
+    const name = wsName.trim();
+    const urls = wsUrls
+      .split(/[\n,]+/)
+      .map((u) => u.trim())
+      .filter(Boolean);
+    if (!name || urls.length === 0) return;
+    createWorkspace.mutate({ name, urls });
+  };
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-8 p-6 overflow-y-auto h-full pb-24 bg-[#1a1412] text-[#f3e9dc]">
 
-      {/* ── Companion Insights ──────────────────────────────────────────────── */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 text-[#c08552] font-bold tracking-wide">
-            <Activity className="w-5 h-5 stroke-[2.5px]" />
-            <h2 className="text-lg uppercase">Companion Insights</h2>
-          </div>
-          {/* Close button — only visible on mobile where the Sheet lacks a built-in X */}
-          <SheetTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-[#895737] hover:text-[#f3e9dc] md:hidden"
-              data-testid="btn-close-companion"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </SheetTrigger>
+      {/* ── Companion Insights ─────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3 text-[#c08552] font-bold tracking-wide">
+          <Activity className="w-5 h-5 stroke-[2.5px]" />
+          <h2 className="text-lg uppercase">Companion Insights</h2>
         </div>
 
-        <Card className="bg-[#2a1f1b] border-none shadow-2xl">
-          <CardContent className="pt-8 pb-8">
-            <div className="grid grid-cols-2 gap-8 text-center relative">
-              <div className="space-y-1">
-                <p className="text-4xl font-display font-bold text-[#f3e9dc]" data-testid="text-tab-count">
-                  {sessionData.tabCount || "--"}
-                </p>
-                <p className="text-[10px] text-[#895737] font-black uppercase tracking-[0.2em]">Tabs Open</p>
-              </div>
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-12 bg-[#3d2b26]" />
-              <div className="space-y-1">
-                <p className="text-4xl font-display font-bold text-[#f3e9dc]" data-testid="text-tab-switches">
-                  {sessionData.tabSwitches || "--"}
-                </p>
-                <p className="text-[10px] text-[#895737] font-black uppercase tracking-[0.2em]">Switches</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* 2×2 stats grid */}
+        <div className="grid grid-cols-2 gap-px bg-[#3d2b26] rounded-2xl overflow-hidden shadow-2xl">
+          <div className="bg-[#2a1f1b] p-5 text-center" data-testid="cell-tab-count">
+            <p className="text-4xl font-display font-bold text-[#f3e9dc]" data-testid="text-tab-count">
+              {sessionData.tabCount || "--"}
+            </p>
+            <p className="text-[10px] text-[#895737] font-black uppercase tracking-[0.2em] mt-1">Tabs Open</p>
+          </div>
+          <div className="bg-[#2a1f1b] p-5 text-center" data-testid="cell-tab-switches">
+            <p className="text-4xl font-display font-bold text-[#f3e9dc]" data-testid="text-tab-switches">
+              {sessionData.tabSwitches || "--"}
+            </p>
+            <p className="text-[10px] text-[#895737] font-black uppercase tracking-[0.2em] mt-1">Switches</p>
+          </div>
+          <div className="bg-[#2a1f1b] p-5 text-center" data-testid="cell-session-duration">
+            <p className="text-2xl font-display font-bold text-[#f3e9dc]" data-testid="text-session-duration">
+              {sessionDuration ?? "--"}
+            </p>
+            <p className="text-[10px] text-[#895737] font-black uppercase tracking-[0.2em] mt-1">Session</p>
+          </div>
+          <div className="bg-[#2a1f1b] p-5 text-center overflow-hidden" data-testid="cell-top-domain">
+            <p
+              className="text-sm font-display font-bold text-[#f3e9dc] truncate leading-tight"
+              data-testid="text-top-domain"
+              title={topDomain ?? ""}
+            >
+              {topDomain ?? "--"}
+            </p>
+            <p className="text-[10px] text-[#895737] font-black uppercase tracking-[0.2em] mt-1">Top Domain</p>
+          </div>
+        </div>
       </section>
 
-      {/* ── Workspaces ──────────────────────────────────────────────────────── */}
-      <section className="space-y-6">
+      {/* ── Workspaces ─────────────────────────────────────────────────────── */}
+      <section className="space-y-4">
         <div className="flex items-center gap-3 text-[#c08552] font-bold tracking-wide">
           <Monitor className="w-5 h-5 stroke-[2.5px]" />
           <h2 className="text-lg uppercase">Workspaces</h2>
         </div>
 
         <div className="grid gap-3">
-          {workspaces?.map(ws => (
+          {workspaces?.map((ws) => (
             <div
               key={ws.id}
               className="group relative flex items-center justify-between p-4 rounded-xl bg-[#2a1f1b] border border-transparent hover:border-[#5e3023] transition-all duration-300"
               data-testid={`card-workspace-${ws.id}`}
             >
               <div className="flex-1 cursor-pointer" onClick={() => launchWorkspace(ws.urls)}>
-                <h3 className="text-sm font-bold text-[#f3e9dc]" data-testid={`text-workspace-name-${ws.id}`}>{ws.name}</h3>
+                <h3 className="text-sm font-bold text-[#f3e9dc]" data-testid={`text-workspace-name-${ws.id}`}>
+                  {ws.name}
+                </h3>
                 <p className="text-[10px] text-[#895737] uppercase tracking-wider">
-                  {ws.urls.length} Resources
+                  {ws.urls.length} Resource{ws.urls.length !== 1 ? "s" : ""}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -329,35 +237,103 @@ export function CompanionPanel() {
             </div>
           ))}
 
-          {/* New Workspace button — uses window.prompt for quick entry */}
-          <Button
-            variant="outline"
-            className="w-full border-dashed border-[#3d2b26] bg-transparent h-14 rounded-xl text-sm font-bold text-[#895737] hover:bg-[#2a1f1b] hover:text-[#c08552] hover:border-[#c08552]/50 transition-all duration-300"
-            data-testid="btn-new-workspace"
-            onClick={() => {
-              const name = prompt("Workspace Name?");
-              const urlsInput = prompt("URLs (comma separated)?");
-              if (name && urlsInput) {
-                const urls = urlsInput.split(",").map(u => u.trim()).filter(Boolean);
-                createWorkspace.mutate({ name, urls });
-              }
-            }}
-          >
-            <Plus className="w-5 h-5 mr-3" /> New Workspace
-          </Button>
+          {workspaces?.length === 0 && !showWorkspaceForm && (
+            <p className="text-xs text-[#895737] italic text-center py-2">
+              No workspaces yet. Create one to launch a set of URLs at once.
+            </p>
+          )}
+
+          {/* Inline workspace creation form */}
+          {showWorkspaceForm ? (
+            <div
+              className="space-y-3 p-4 bg-[#2a1f1b] rounded-xl border border-[#3d2b26]"
+              data-testid="form-new-workspace"
+            >
+              <Input
+                placeholder="Workspace name..."
+                value={wsName}
+                onChange={(e) => setWsName(e.target.value)}
+                className="bg-black/20 border-[#3d2b26] text-[#f3e9dc] focus:border-[#c08552] placeholder:text-[#895737]"
+                autoFocus
+                data-testid="input-workspace-name"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowWorkspaceForm(false);
+                    setWsName("");
+                    setWsUrls("");
+                  }
+                  if (e.key === "Enter" && e.metaKey) handleCreateWorkspace();
+                }}
+              />
+              <Textarea
+                placeholder={"URLs — one per line or comma-separated:\nhttps://github.com\nhttps://figma.com"}
+                value={wsUrls}
+                onChange={(e) => setWsUrls(e.target.value)}
+                rows={4}
+                className="bg-black/20 border-[#3d2b26] text-[#f3e9dc] text-xs resize-none font-mono focus:border-[#c08552] placeholder:text-[#895737]/60"
+                data-testid="input-workspace-urls"
+              />
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-[#c08552] hover:bg-[#895737] text-white h-9 text-sm"
+                  disabled={!wsName.trim() || !wsUrls.trim() || createWorkspace.isPending}
+                  onClick={handleCreateWorkspace}
+                  data-testid="btn-create-workspace"
+                >
+                  {createWorkspace.isPending ? "Creating..." : "Create Workspace"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-9 text-[#895737] hover:text-[#f3e9dc] border border-[#3d2b26] hover:border-[#895737]"
+                  onClick={() => {
+                    setShowWorkspaceForm(false);
+                    setWsName("");
+                    setWsUrls("");
+                  }}
+                  data-testid="btn-cancel-workspace"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full border-dashed border-[#3d2b26] bg-transparent h-14 rounded-xl text-sm font-bold text-[#895737] hover:bg-[#2a1f1b] hover:text-[#c08552] hover:border-[#c08552]/50 transition-all duration-300"
+              data-testid="btn-new-workspace"
+              onClick={() => setShowWorkspaceForm(true)}
+            >
+              <Plus className="w-5 h-5 mr-3" /> New Workspace
+            </Button>
+          )}
         </div>
       </section>
 
-      {/* ── Nudge Settings ──────────────────────────────────────────────────── */}
-      <section className="space-y-6">
+      {/* ── Nudge Settings ─────────────────────────────────────────────────── */}
+      <section className="space-y-4">
         <div className="flex items-center gap-3 text-[#c08552] font-bold tracking-wide">
           <Bell className="w-5 h-5 stroke-[2.5px]" />
           <h2 className="text-lg uppercase">Nudge Settings</h2>
         </div>
 
         <Card className="bg-[#2a1f1b] border-none shadow-xl">
-          <CardContent className="pt-8 space-y-8">
-            {/* Enable / disable all nudges */}
+          <CardContent className="pt-6 space-y-6">
+
+            {/* Tracking master toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-sm font-bold text-[#f3e9dc]">Enable Tracking</span>
+                <p className="text-[10px] text-[#895737] uppercase tracking-wider italic">Companion is active</p>
+              </div>
+              <Switch
+                className="data-[state=checked]:bg-[#c08552] data-[state=unchecked]:bg-[#3d2b26]"
+                checked={settings?.trackingEnabled ?? true}
+                onCheckedChange={(checked) => updateSettings.mutate({ trackingEnabled: checked })}
+                data-testid="switch-tracking-enabled"
+              />
+            </div>
+
+            {/* Nudges master toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <span className="text-sm font-bold text-[#f3e9dc]">Enable Nudges</span>
@@ -366,17 +342,20 @@ export function CompanionPanel() {
               <Switch
                 className="data-[state=checked]:bg-[#c08552] data-[state=unchecked]:bg-[#3d2b26]"
                 checked={settings?.nudgesEnabled ?? true}
-                onCheckedChange={checked => updateSettings.mutate({ nudgesEnabled: checked })}
+                onCheckedChange={(checked) => updateSettings.mutate({ nudgesEnabled: checked })}
                 data-testid="switch-nudges-enabled"
               />
             </div>
 
-            {/* Tab threshold slider */}
-            <div className="space-y-4">
+            {/* Tab threshold */}
+            <div className="space-y-3">
               <div className="flex justify-between items-end">
                 <label className="text-sm font-bold text-[#f3e9dc]">Tab Threshold</label>
-                <span className="text-xl font-display font-bold text-[#c08552]" data-testid="text-tab-threshold">
-                  ({settings?.tabCountThreshold ?? 10})
+                <span
+                  className="text-xl font-display font-bold text-[#c08552]"
+                  data-testid="text-tab-threshold"
+                >
+                  {settings?.tabCountThreshold ?? 10}
                 </span>
               </div>
               <Slider
@@ -388,7 +367,60 @@ export function CompanionPanel() {
                 className="[&_[role=slider]]:bg-[#c08552] [&_[role=slider]]:border-none"
                 data-testid="slider-tab-threshold"
               />
+              <div className="flex justify-between text-[10px] text-[#895737]">
+                <span>2 tabs</span>
+                <span>50 tabs</span>
+              </div>
             </div>
+
+            {/* Idle threshold */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <label className="text-sm font-bold text-[#f3e9dc]">Idle Detection</label>
+                <span
+                  className="text-xl font-display font-bold text-[#c08552]"
+                  data-testid="text-idle-threshold"
+                >
+                  {settings?.idleThreshold ?? 300}s
+                </span>
+              </div>
+              <Slider
+                min={60}
+                max={900}
+                step={30}
+                value={[settings?.idleThreshold ?? 300]}
+                onValueChange={([val]) => updateSettings.mutate({ idleThreshold: val })}
+                className="[&_[role=slider]]:bg-[#c08552] [&_[role=slider]]:border-none"
+                data-testid="slider-idle-threshold"
+              />
+              <div className="flex justify-between text-[10px] text-[#895737]">
+                <span>1 min</span>
+                <span>15 min</span>
+              </div>
+            </div>
+
+            {/* Nudge frequency */}
+            <div className="space-y-3">
+              <label className="text-sm font-bold text-[#f3e9dc]">Nudge Frequency</label>
+              <div className="flex gap-2" data-testid="nudge-frequency-selector">
+                {(["low", "medium", "high"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => updateSettings.mutate({ nudgeFrequency: f })}
+                    className={cn(
+                      "flex-1 py-2 rounded-lg text-xs font-bold border capitalize transition-all",
+                      (settings?.nudgeFrequency ?? "medium") === f
+                        ? "bg-[#c08552]/20 text-[#c08552] border-[#c08552]/50"
+                        : "bg-transparent text-[#895737] border-[#3d2b26] hover:border-[#895737] hover:text-[#f3e9dc]",
+                    )}
+                    data-testid={`btn-frequency-${f}`}
+                  >
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
           </CardContent>
         </Card>
       </section>

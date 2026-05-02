@@ -1,3 +1,19 @@
+/**
+ * client/src/pages/home-page.tsx
+ *
+ * The authenticated user's main bookmark library page.
+ *
+ * Layout:
+ *  - Desktop: persistent Sidebar on the left (w-64, hidden on mobile)
+ *  - Mobile: hamburger button in the header opens the Sidebar in a Sheet drawer
+ *
+ * Features:
+ *  - Live search with 300 ms debounce (delegates to server via ?search=)
+ *  - Tag filter via ?tag= query param (populated by sidebar tag links)
+ *  - Bookmark grid with animated cards
+ *  - "Add Bookmark" dialog in the header
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useBookmarks } from '@/hooks/use-bookmarks';
@@ -5,49 +21,66 @@ import { BookmarkCard } from '@/components/bookmark-card';
 import { Sidebar } from '@/components/sidebar';
 import { AddBookmarkDialog } from '@/components/add-bookmark-dialog';
 import { ShinyButton } from '@/components/ui/shiny-button';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, FilterX, Loader2 } from 'lucide-react';
+import { Plus, Search, FilterX, Loader2, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
-  const [search, setSearch] = useState('');
+  const [search, setSearch]               = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [location] = useLocation();
-  
+
+  // 300 ms debounce keeps the API call count low while typing
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Parse query params
   const params = new URLSearchParams(window.location.search);
-  const tag = params.get('tag') || undefined;
-  
-  const { data: bookmarks, isLoading, isError } = useBookmarks({ 
-    search: debouncedSearch || undefined, 
-    tag 
+  const tag    = params.get('tag') || undefined;
+
+  const { data: bookmarks, isLoading, isError } = useBookmarks({
+    search: debouncedSearch || undefined,
+    tag,
   });
 
   const clearFilters = () => {
     setSearch('');
-    window.history.pushState({}, '', '/');
-    // Force re-render/nav by dispatching event or relying on wouter if we used Link
-    window.location.href = '/'; 
+    window.location.href = '/';
   };
 
   return (
     <div className="flex h-screen bg-background overflow-hidden text-foreground">
-      {/* Sidebar - hidden on mobile default, visible on larger screens */}
+
+      {/* Desktop sidebar — hidden below md */}
       <Sidebar className="w-64 hidden md:flex flex-shrink-0 z-20" />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        {/* Header */}
-        <header className="h-16 border-b border-white/5 bg-background/80 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-10">
-          <div className="flex items-center flex-1 max-w-xl gap-4">
+
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <header className="h-16 border-b border-white/5 bg-background/80 backdrop-blur-md flex items-center gap-3 px-4 md:px-6 sticky top-0 z-10">
+
+          {/* Mobile hamburger — opens Sidebar in a Sheet, visible only below md */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden flex-shrink-0"
+                data-testid="btn-mobile-menu"
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0 bg-background border-r border-white/5">
+              <Sidebar className="flex w-full h-full" />
+            </SheetContent>
+          </Sheet>
+
+          {/* Search bar */}
+          <div className="flex items-center flex-1 max-w-xl">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -55,11 +88,13 @@ export default function HomePage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 bg-secondary/50 border-transparent focus:bg-secondary focus:border-primary/30 transition-all rounded-xl"
+                data-testid="input-search"
               />
             </div>
           </div>
-          
-          <div className="flex items-center gap-4 ml-4">
+
+          {/* Add bookmark CTA */}
+          <div className="ml-auto flex-shrink-0">
             <AddBookmarkDialog trigger={
               <ShinyButton className="h-9 text-sm px-4">
                 <Plus className="w-4 h-4 mr-1.5" />
@@ -69,29 +104,30 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* Content Area */}
+        {/* ── Content ─────────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <div className="max-w-7xl mx-auto">
-            
-            {/* Page Title / Filter Status */}
+
+            {/* Page title + filter status */}
             <div className="mb-8 flex items-end justify-between">
               <div>
                 <h2 className="text-3xl font-display font-bold text-white mb-2">
-                  {tag ? `#${tag}` : search ? `Search: ${search}` : 'All Bookmarks'}
+                  {tag ? `#${tag}` : search ? `"${search}"` : 'All Bookmarks'}
                 </h2>
-                <p className="text-muted-foreground">
-                  {isLoading 
-                    ? 'Syncing your library...' 
-                    : `${bookmarks?.length || 0} items found`}
+                <p className="text-muted-foreground" data-testid="text-bookmark-count">
+                  {isLoading
+                    ? 'Syncing your library...'
+                    : `${bookmarks?.length ?? 0} bookmark${bookmarks?.length !== 1 ? 's' : ''} found`}
                 </p>
               </div>
-              
+
               {(tag || search) && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={clearFilters}
                   className="text-muted-foreground hover:text-white border-white/10"
+                  data-testid="btn-clear-filters"
                 >
                   <FilterX className="w-4 h-4 mr-2" />
                   Clear Filters
@@ -124,7 +160,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">No bookmarks found</h3>
                 <p className="text-muted-foreground max-w-sm mb-6">
-                  {tag || search 
+                  {tag || search
                     ? "Try adjusting your filters or search query."
                     : "Your library is empty. Add your first bookmark to get started."}
                 </p>
