@@ -119,13 +119,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnPopout.classList.remove('hidden');
     btnDock.classList.add('hidden');
 
-    btnPopout.addEventListener('click', () => {
-      // Delegate everything to background.js via OPEN_POPUP:
-      //  1. background captures the active tab ID
-      //  2. creates the popup window
-      //  3. THEN disables the side panel — popup is visible before panel closes
-      //  4. onRemoved re-enables the panel if the popup is closed via OS X button
-      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
+    btnPopout.addEventListener('click', async () => {
+      // Pass our own window ID so background.js can query the correct active tab
+      // without relying on `currentWindow: true` (unreliable from service worker context)
+      const win = await chrome.windows.getCurrent();
+      chrome.runtime.sendMessage({ type: 'OPEN_POPUP', sourceWindowId: win.id });
     });
   }
 
