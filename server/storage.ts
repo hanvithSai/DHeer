@@ -35,7 +35,7 @@ import {
   type Todo,
   type InsertTodo,
 } from "@shared/schema";
-import { eq, desc, asc, and, sql } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, sql } from "drizzle-orm";
 import { users, type User } from "@shared/models/auth";
 
 // ── Interface ──────────────────────────────────────────────────────────────────
@@ -142,7 +142,32 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     options?: { search?: string; tag?: string },
   ): Promise<BookmarkResponse[]> {
-    const whereClause = eq(bookmarks.userId, userId);
+    const whereClause = and(
+      eq(bookmarks.userId, userId),
+      // SQL ILIKE search across title, url, note, and tag names
+      options?.search
+        ? or(
+            ilike(bookmarks.title, `%${options.search}%`),
+            ilike(bookmarks.url,   `%${options.search}%`),
+            ilike(bookmarks.note,  `%${options.search}%`),
+            sql`EXISTS (
+              SELECT 1 FROM bookmark_tags bt_s
+              JOIN tags t_s ON bt_s.tag_id = t_s.id
+              WHERE bt_s.bookmark_id = ${bookmarks.id}
+              AND LOWER(t_s.name) LIKE LOWER(${'%' + options.search + '%'})
+            )`,
+          )
+        : undefined,
+      // SQL EXISTS filter for exact tag name match
+      options?.tag
+        ? sql`EXISTS (
+            SELECT 1 FROM bookmark_tags bt_t
+            JOIN tags t_t ON bt_t.tag_id = t_t.id
+            WHERE bt_t.bookmark_id = ${bookmarks.id}
+            AND t_t.name = ${options.tag}
+          )`
+        : undefined,
+    );
 
     const rows = await db
       .select({
@@ -161,26 +186,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(bookmarks.id)
       .orderBy(desc(bookmarks.createdAt));
 
-    let result = rows.map(row => ({ ...row.bookmark, tags: row.tags }));
-
-    // In-memory search filter (runs after DB query)
-    if (options?.search) {
-      const q = options.search.toLowerCase();
-      result = result.filter(
-        b =>
-          b.title?.toLowerCase().includes(q) ||
-          b.url.toLowerCase().includes(q) ||
-          b.note?.toLowerCase().includes(q) ||
-          b.tags.some(t => t.name.toLowerCase().includes(q)),
-      );
-    }
-
-    // In-memory tag filter
-    if (options?.tag) {
-      result = result.filter(b => b.tags.some(t => t.name === options.tag));
-    }
-
-    return result;
+    return rows.map(row => ({ ...row.bookmark, tags: row.tags }));
   }
 
   /**
@@ -204,6 +210,18 @@ export class DatabaseStorage implements IStorage {
           ) filter (where ${tags.id} is not null),
           '[]'
         )`,
+        // Correlated subquery — returns the owner's full name (or null if not set)
+        authorName: sql<string | null>`(
+          SELECT NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '')
+          FROM users u
+          WHERE u.id = ${bookmarks.userId}
+        )`,
+        // Correlated subquery — returns the owner's profile image URL
+        authorAvatar: sql<string | null>`(
+          SELECT u.profile_image_url
+          FROM users u
+          WHERE u.id = ${bookmarks.userId}
+        )`,
       })
       .from(bookmarks)
       .leftJoin(bookmarkTags, eq(bookmarks.id, bookmarkTags.bookmarkId))
@@ -213,7 +231,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(bookmarks.createdAt))
       .limit(50);
 
-    return rows.map(row => ({ ...row.bookmark, tags: row.tags }));
+    return rows.map(row => ({
+      ...row.bookmark,
+      tags:         row.tags,
+      authorName:   row.authorName,
+      authorAvatar: row.authorAvatar,
+    }));
   }
 
   /**
@@ -475,7 +498,7 @@ export class DatabaseStorage implements IStorage {
   async createWorkspace(userId: string, workspace: InsertWorkspace): Promise<Workspace> {
     const [created] = await db
       .insert(workspaces)
-      .values({ ...workspace, userId })
+      .values({ userId, name: workspace.name, urls: workspace.urls as string[] })
       .returning();
     return created;
   }

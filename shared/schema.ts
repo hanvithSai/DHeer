@@ -249,4 +249,4 @@ export type InsertTodo            = z.infer<typeof insertTodoSchema>;
  */
 export type CreateBookmarkRequest = InsertBookmark & { tags?: string[] };
 export type UpdateBookmarkRequest = Partial<CreateBookmarkRequest>;
-export type BookmarkResponse      = Bookmark & { tags: Tag[] };
+export type BookmarkResponse      = Bookmark & { tags: Tag[]; authorName?: string | null; authorAvatar?: string | null };

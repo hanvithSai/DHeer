@@ -7,7 +7,9 @@
     "sidePanel",
     "activeTab",
     "storage",
-    "tabs"
+    "tabs",
+    "idle",
+    "notifications"
   ],
   "host_permissions": [
     "*://*/*"
