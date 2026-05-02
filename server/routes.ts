@@ -241,6 +241,75 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * POST /api/bookmarks/import
+   *
+   * Accepts a JSON body with one of two shapes:
+   *  { type: "urls",  content: string }  — newline-separated URL list
+   *  { type: "html",  content: string }  — raw HTML from a browser bookmark export
+   *
+   * The server parses the content, extracts { url, title } pairs, deduplicates
+   * against the user's existing bookmarks, and batch-inserts the new ones.
+   *
+   * Response 200: { imported: number, duplicates: number }
+   * Response 400: Validation or parse error
+   * Response 500: Unexpected DB error
+   */
+  app.post("/api/bookmarks/import", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+
+      const bodySchema = z.object({
+        type:    z.enum(["urls", "html"]),
+        content: z.string().min(1, "Content is required"),
+      });
+
+      const { type, content } = bodySchema.parse(req.body);
+
+      let items: { url: string; title?: string }[] = [];
+
+      if (type === "urls") {
+        // One URL per line — skip blank lines and non-URL strings
+        const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          try {
+            new URL(line); // validate
+            items.push({ url: line });
+          } catch {
+            // skip invalid lines silently
+          }
+        }
+      } else {
+        // HTML NETSCAPE bookmark file — extract <A HREF="..." ...>Title</A> pairs
+        const linkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi;
+        let match: RegExpExecArray | null;
+        while ((match = linkRegex.exec(content)) !== null) {
+          const url   = match[1].trim();
+          const title = match[2].trim() || undefined;
+          try {
+            new URL(url); // validate
+            items.push({ url, title });
+          } catch {
+            // skip non-http entries like "place:..." or "javascript:..."
+          }
+        }
+      }
+
+      if (items.length === 0) {
+        return res.status(400).json({ message: "No valid URLs found in the imported content" });
+      }
+
+      const result = await storage.batchImportBookmarks(userId, items);
+      res.json(result);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    }
+  });
+
   // ── Tags API ─────────────────────────────────────────────────────────────────
 
   /**

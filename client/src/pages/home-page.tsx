@@ -23,9 +23,10 @@ import { AddBookmarkDialog } from '@/components/add-bookmark-dialog';
 import { ShinyButton } from '@/components/ui/shiny-button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, FilterX, Loader2, Menu } from 'lucide-react';
+import { Plus, Search, FilterX, Loader2, Menu, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { ImportBookmarksDialog } from '@/components/import-bookmarks-dialog';
 
 export default function HomePage() {
   const [search, setSearch]               = useState('');
@@ -93,8 +94,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Add bookmark CTA */}
-          <div className="ml-auto flex-shrink-0">
+          {/* Import + Add bookmark CTAs */}
+          <div className="ml-auto flex-shrink-0 flex items-center gap-2">
+            <ImportBookmarksDialog trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 text-sm px-3 sm:px-4 border-white/10 hover:text-white flex"
+                data-testid="btn-import-bookmarks"
+              >
+                <Upload className="w-4 h-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Import</span>
+              </Button>
+            } />
             <AddBookmarkDialog trigger={
               <ShinyButton className="h-9 text-sm px-4">
                 <Plus className="w-4 h-4 mr-1.5" />

@@ -65,6 +65,8 @@ export interface IStorage {
   updateBookmark(userId: string, id: number, updates: UpdateBookmarkRequest): Promise<BookmarkResponse>;
   deleteBookmark(userId: string, id: number): Promise<void>;
 
+  batchImportBookmarks(userId: string, items: { url: string; title?: string }[]): Promise<{ imported: number; duplicates: number }>;
+
   // ── Tags ─────────────────────────────────────────────────────────────────────
   getTags(userId: string): Promise<Tag[]>;
   updateTag(userId: string, id: number, name: string): Promise<Tag>;
@@ -388,6 +390,61 @@ export class DatabaseStorage implements IStorage {
   async deleteBookmark(userId: string, id: number): Promise<void> {
     await db.delete(bookmarkTags).where(eq(bookmarkTags.bookmarkId, id));
     await db.delete(bookmarks).where(and(eq(bookmarks.id, id), eq(bookmarks.userId, userId)));
+  }
+
+  /**
+   * batchImportBookmarks
+   *
+   * Accepts an array of { url, title? } items and inserts those whose URL does
+   * not already exist for the user.  Existing URLs are silently skipped
+   * (deduplicated) rather than overwritten.
+   *
+   * @param userId — Owner of the new bookmarks
+   * @param items  — Array of { url, title? } objects parsed from the import source
+   * @returns       Summary: { imported, duplicates }
+   */
+  async batchImportBookmarks(
+    userId: string,
+    items: { url: string; title?: string }[],
+  ): Promise<{ imported: number; duplicates: number }> {
+    if (items.length === 0) return { imported: 0, duplicates: 0 };
+
+    // 1. Deduplicate within the import payload itself (first occurrence wins)
+    const seenInPayload = new Set<string>();
+    const uniqueItems: typeof items = [];
+    for (const item of items) {
+      if (!seenInPayload.has(item.url)) {
+        seenInPayload.add(item.url);
+        uniqueItems.push(item);
+      }
+    }
+    const intraDuplicates = items.length - uniqueItems.length;
+
+    // 2. Fetch existing URLs for this user in one query to deduplicate against DB
+    const existing = await db
+      .select({ url: bookmarks.url })
+      .from(bookmarks)
+      .where(eq(bookmarks.userId, userId));
+    const existingUrls = new Set(existing.map(r => r.url));
+
+    const newItems = uniqueItems.filter(item => !existingUrls.has(item.url));
+    const duplicates = intraDuplicates + (uniqueItems.length - newItems.length);
+
+    if (newItems.length > 0) {
+      // Insert in chunks of 100 to avoid very large parameterized queries
+      const CHUNK = 100;
+      for (let i = 0; i < newItems.length; i += CHUNK) {
+        const chunk = newItems.slice(i, i + CHUNK).map(item => ({
+          userId,
+          url: item.url,
+          title: item.title || item.url,
+          savedFrom: "import" as const,
+        }));
+        await db.insert(bookmarks).values(chunk);
+      }
+    }
+
+    return { imported: newItems.length, duplicates };
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
