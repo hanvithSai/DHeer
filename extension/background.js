@@ -365,30 +365,38 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   } else if (request.type === "OPEN_POPUP") {
     /**
      * OPEN_POPUP — reliable pop-out flow:
-     *  1. Capture the active tab ID BEFORE anything else (avoids wrong-window queries)
-     *  2. Create the floating popup window
-     *  3. Only after the window is confirmed created, disable the side panel for
-     *     the captured tab — this guarantees the popup is visible before the panel closes
-     *  4. Store window + tab IDs in popupState so onRemoved can re-enable the panel
+     *  1. Create the popup window FIRST — no tab query needed for this step,
+     *     so the popup always opens regardless of service-worker window context.
+     *  2. After the window is confirmed created, query the active tab using the
+     *     sourceWindowId supplied by the side panel (avoids the `currentWindow: true`
+     *     service-worker unreliability that caused the popup not to open).
+     *  3. Disable the side panel for that specific tab — it's already behind the popup.
+     *  4. Store IDs in popupState so onRemoved can re-enable the panel automatically.
      */
-    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-      const tab = tabs[0];
-      if (!tab) return;
+    const sourceWindowId = request.sourceWindowId;
+    const popupUrl = chrome.runtime.getURL("sidepanel.html?mode=popup");
 
-      const popupUrl = chrome.runtime.getURL("sidepanel.html?mode=popup");
-      chrome.windows.create(
-        { url: popupUrl, type: "popup", width: 420, height: 680, focused: true },
-        newWindow => {
-          if (chrome.runtime.lastError || !newWindow) return;
-          // Store state for onRemoved cleanup
-          popupState = { windowId: newWindow.id, sourceTabId: tab.id };
-          // Disable the panel NOW — popup is already visible so UX is seamless
-          chrome.sidePanel
-            .setOptions({ tabId: tab.id, enabled: false })
-            .catch(() => {});
-        },
-      );
-    });
+    chrome.windows.create(
+      { url: popupUrl, type: "popup", width: 420, height: 680, focused: true },
+      newWindow => {
+        if (chrome.runtime.lastError || !newWindow) return;
+
+        // Query the source window's active tab now that the popup exists
+        const queryOpts = sourceWindowId != null
+          ? { active: true, windowId: sourceWindowId }
+          : { active: true, lastFocusedWindow: true };
+
+        chrome.tabs.query(queryOpts, tabs => {
+          const tabId = tabs[0]?.id ?? null;
+          popupState = { windowId: newWindow.id, sourceTabId: tabId };
+          if (tabId != null) {
+            chrome.sidePanel
+              .setOptions({ tabId, enabled: false })
+              .catch(() => {});
+          }
+        });
+      },
+    );
 
   } else if (request.type === "OPEN_SIDEPANEL") {
     /**
