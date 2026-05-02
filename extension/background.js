@@ -362,41 +362,24 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   } else if (request.type === "LAUNCH_WORKSPACE") {
     launchWorkspace(request.urls);
 
-  } else if (request.type === "OPEN_POPUP") {
+  } else if (request.type === "POPUP_CREATED") {
     /**
-     * OPEN_POPUP — reliable pop-out flow:
-     *  1. Create the popup window FIRST — no tab query needed for this step,
-     *     so the popup always opens regardless of service-worker window context.
-     *  2. After the window is confirmed created, query the active tab using the
-     *     sourceWindowId supplied by the side panel (avoids the `currentWindow: true`
-     *     service-worker unreliability that caused the popup not to open).
-     *  3. Disable the side panel for that specific tab — it's already behind the popup.
-     *  4. Store IDs in popupState so onRemoved can re-enable the panel automatically.
+     * POPUP_CREATED — sent by sidepanel.js after it successfully calls
+     * chrome.windows.create() directly (extension pages are reliable for this;
+     * the service worker is not).
+     *
+     * Responsibilities here are purely side-panel state management:
+     *  1. Record the popup window ID + source tab ID in popupState so that
+     *     onRemoved can re-enable the panel when the popup closes.
+     *  2. Disable the side panel for the source tab (popup is already visible).
      */
-    const sourceWindowId = request.sourceWindowId;
-    const popupUrl = chrome.runtime.getURL("sidepanel.html?mode=popup");
-
-    chrome.windows.create(
-      { url: popupUrl, type: "popup", width: 420, height: 680, focused: true },
-      newWindow => {
-        if (chrome.runtime.lastError || !newWindow) return;
-
-        // Query the source window's active tab now that the popup exists
-        const queryOpts = sourceWindowId != null
-          ? { active: true, windowId: sourceWindowId }
-          : { active: true, lastFocusedWindow: true };
-
-        chrome.tabs.query(queryOpts, tabs => {
-          const tabId = tabs[0]?.id ?? null;
-          popupState = { windowId: newWindow.id, sourceTabId: tabId };
-          if (tabId != null) {
-            chrome.sidePanel
-              .setOptions({ tabId, enabled: false })
-              .catch(() => {});
-          }
-        });
-      },
-    );
+    const { popupWindowId, sourceTabId } = request;
+    popupState = { windowId: popupWindowId, sourceTabId: sourceTabId ?? null };
+    if (sourceTabId != null) {
+      chrome.sidePanel
+        .setOptions({ tabId: sourceTabId, enabled: false })
+        .catch(() => {});
+    }
 
   } else if (request.type === "OPEN_SIDEPANEL") {
     /**
