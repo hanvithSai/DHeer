@@ -101,19 +101,31 @@ let config = {
  * initSession
  *
  * Queries all open tabs at service worker startup and sets the initial
- * `sessionMetadata.tabCount`.  Ensures the Insights card shows an accurate
- * count immediately when the sidepanel is opened.
+ * `sessionMetadata.tabCount`.  Also restores the last-known companion
+ * settings from `chrome.storage.local` so that user preferences survive
+ * service worker termination (which Chrome does regularly to save resources).
  *
  * Called once at the top level (service worker boot).
  *
  * Impact if changed:
  *  - Removing this call means tabCount starts at 0 until the next tab event
- *  - Adding chrome.storage.local.get here could restore the previous session's
- *    switch count across service worker restarts
+ *  - Removing the storage.local.get call means config resets to hardcoded
+ *    defaults on every service worker restart, silently reverting thresholds
  */
 async function initSession() {
   const tabs = await chrome.tabs.query({});
   sessionMetadata.tabCount = tabs.length;
+
+  // Restore persisted companion settings so config survives service worker restarts.
+  // chrome.storage.local survives termination unlike in-memory variables.
+  try {
+    const stored = await chrome.storage.local.get('companionConfig');
+    if (stored.companionConfig) {
+      config = { ...config, ...stored.companionConfig };
+    }
+  } catch (err) {
+    console.warn('[DHeer] Could not restore companion config from storage:', err);
+  }
 }
 
 initSession();
@@ -356,6 +368,10 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 
   } else if (request.type === "UPDATE_CONFIG") {
     config = { ...config, ...request.config };
+    // Persist to chrome.storage.local so settings survive service worker restarts.
+    chrome.storage.local.set({ companionConfig: config }).catch(err =>
+      console.warn('[DHeer] Could not persist companion config:', err)
+    );
 
   } else if (request.type === "LAUNCH_WORKSPACE") {
     launchWorkspace(request.urls);
