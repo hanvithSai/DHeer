@@ -6,3 +6,9 @@ id = "7yGUHNwuL0w7CWUAaS97D"
 uri = "file://PRD.md"
 type = "text"
 title = "DHeer PRD — v1.1 with Replit Dependency Audit"
+
+[[outputs]]
+id = "gECZLvcS8YntvkeQ_bVNP"
+uri = "file://SPRINT.md"
+type = "text"
+title = "DHeer Sprint Backlog"
