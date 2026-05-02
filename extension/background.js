@@ -315,11 +315,9 @@ let popupState = { windowId: null, sourceTabId: null };
  */
 chrome.windows.onRemoved.addListener(windowId => {
   if (windowId === popupState.windowId) {
-    const tabId = popupState.sourceTabId;
     popupState = { windowId: null, sourceTabId: null };
-    if (tabId != null) {
-      chrome.sidePanel.setOptions({ tabId, enabled: true }).catch(() => {});
-    }
+    // Re-enable the global panel (matches how it was disabled — without tabId)
+    chrome.sidePanel.setOptions({ enabled: true }).catch(() => {});
   }
 });
 
@@ -375,16 +373,25 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
      */
     const { popupWindowId, sourceTabId } = request;
     popupState = { windowId: popupWindowId, sourceTabId: sourceTabId ?? null };
-    if (sourceTabId != null) {
-      // 1. Disable the panel — this closes it immediately.
-      // 2. Wait 800 ms so Chrome has time to render the close before we re-enable.
-      // 3. Re-enable (does NOT reopen) so the user can click the icon to have both open.
-      chrome.sidePanel
-        .setOptions({ tabId: sourceTabId, enabled: false })
-        .then(() => new Promise(resolve => setTimeout(resolve, 800)))
-        .then(() => chrome.sidePanel.setOptions({ tabId: sourceTabId, enabled: true }))
-        .catch(() => {});
-    }
+
+    // ROOT CAUSE FIX:
+    // The panel was opened via setPanelBehavior({ openPanelOnActionClick: true }),
+    // which is a GLOBAL (window-level) setting — not tab-specific.
+    // Calling setOptions({ tabId: X, enabled: false }) only creates a tab-specific
+    // override and has NO effect on a globally-opened panel.
+    // To close the currently visible global panel, setOptions must be called
+    // WITHOUT a tabId so it targets the global default context.
+    //
+    // Sequence:
+    //  1. setOptions({ enabled: false })  → closes the global panel immediately
+    //  2. wait 300 ms                     → let Chrome render the close
+    //  3. setOptions({ enabled: true })   → re-enable (does NOT reopen — user must
+    //                                       click the icon to get both open together)
+    chrome.sidePanel
+      .setOptions({ enabled: false })
+      .then(() => new Promise(resolve => setTimeout(resolve, 300)))
+      .then(() => chrome.sidePanel.setOptions({ enabled: true }))
+      .catch(err => console.error("[DHeer] setOptions error:", err));
 
   } else if (request.type === "OPEN_SIDEPANEL") {
     /**
