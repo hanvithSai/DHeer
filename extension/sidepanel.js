@@ -120,10 +120,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnDock.classList.add('hidden');
 
     btnPopout.addEventListener('click', async () => {
-      // Pass our own window ID so background.js can query the correct active tab
-      // without relying on `currentWindow: true` (unreliable from service worker context)
-      const win = await chrome.windows.getCurrent();
-      chrome.runtime.sendMessage({ type: 'OPEN_POPUP', sourceWindowId: win.id });
+      const popupUrl = chrome.runtime.getURL('sidepanel.html?mode=popup');
+
+      // Capture the active tab NOW — while still in this window's context — so
+      // background.js doesn't have to guess which tab owns this side panel.
+      let sourceTabId = null;
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        sourceTabId = tab?.id ?? null;
+      } catch (_) {}
+
+      // Create the popup directly from the extension page (most reliable).
+      // Routing chrome.windows.create through the service worker is unreliable
+      // because the service worker has no stable window context.
+      chrome.windows.create(
+        { url: popupUrl, type: 'popup', width: 420, height: 680, focused: true },
+        (newWindow) => {
+          if (chrome.runtime.lastError) {
+            console.error('[DHeer] popup open failed:', chrome.runtime.lastError.message);
+            return;
+          }
+          // Notify background only to handle side-panel state (close + track for re-enable)
+          chrome.runtime.sendMessage({
+            type: 'POPUP_CREATED',
+            popupWindowId: newWindow.id,
+            sourceTabId,
+          });
+        },
+      );
     });
   }
 
