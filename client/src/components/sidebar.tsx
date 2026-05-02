@@ -23,7 +23,7 @@
 
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Hash, Home, Globe, LogOut, Loader2, MoreVertical, Edit2, Trash2, Check, X, CheckSquare } from "lucide-react";
+import { Hash, Home, Globe, LogOut, Loader2, MoreVertical, Edit2, Trash2, Check, X, CheckSquare, BarChart2 } from "lucide-react";
 import { CompanionPanel } from "./companion-panel";
 import { TodoPanel } from "./todo-panel";
 import {
@@ -140,8 +140,9 @@ export function Sidebar({ className }: SidebarProps) {
    *    so the tag items in the Tags section can be highlighted independently
    */
   const navItems = [
-    { label: "All Bookmarks", icon: Home,  path: "/",       active: location === "/"       && !currentTag },
-    { label: "Public Feed",   icon: Globe, path: "/public", active: location === "/public" },
+    { label: "All Bookmarks", icon: Home,      path: "/",             active: location === "/"             && !currentTag },
+    { label: "Public Feed",   icon: Globe,     path: "/public",       active: location === "/public"       },
+    { label: "Productivity",  icon: BarChart2, path: "/productivity", active: location === "/productivity" },
   ];
 
   return (

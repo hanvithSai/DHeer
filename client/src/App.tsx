@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home-page";
 import LandingPage from "@/pages/landing-page";
 import PublicBookmarksPage from "@/pages/public-bookmarks";
+import ProductivityPage from "@/pages/productivity-page";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -25,7 +26,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/public" component={PublicBookmarksPage} />
-      
+      <Route path="/productivity">
+        {user ? <ProductivityPage /> : <LandingPage />}
+      </Route>
+
       {/* Root path checks auth status */}
       <Route path="/">
         {user ? <HomePage /> : <LandingPage />}

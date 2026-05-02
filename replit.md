@@ -8,7 +8,10 @@ DHeer is a modern bookmark web application with a companion browser extension. U
 - User authentication via Replit Auth (OpenID Connect)
 - Bookmark CRUD operations with tags and public/private visibility
 - Search and filter bookmarks by title, URL, notes, and tags
-- Public feed showing community bookmarks
+- Bookmark import from URL list or browser HTML export
+- Public feed showing community bookmarks with author attribution
+- Todo management with custom statuses and priorities
+- **Productivity dashboard** at `/productivity` — live tab analytics, per-domain time tracking, per-tab breakdown, session stats (pulls from Chrome extension)
 - Chrome extension with side panel for quick bookmark saving
 
 ## User Preferences
