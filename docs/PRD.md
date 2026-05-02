@@ -6,7 +6,7 @@
 | Field | Detail |
 |---|---|
 | **Product** | DHeer |
-| **Version** | 2.0 |
+| **Version** | 2.1 |
 | **Status** | Living Document |
 | **Owner** | Product |
 | **Last Updated** | May 2026 |
@@ -133,6 +133,7 @@ A lightweight, opinionated bookmark manager that lives in the browser sidebar �
 | US-07 | User | Mark a bookmark public or private | I control what the community sees |
 | US-08 | User | Edit or delete any of my bookmarks | I keep my library clean and accurate |
 | US-09 | User | Search across title, URL, note, and tags | I find any saved link within seconds |
+| US-21 | User | Import bookmarks from a URL list or browser HTML export | I migrate my existing library without re-saving each link |
 
 ### Discovery
 | ID | As a… | I want to… | So that… |
@@ -156,6 +157,13 @@ A lightweight, opinionated bookmark manager that lives in the browser sidebar �
 | US-18 | User | Set my own tab threshold for nudges | The alerts match my personal working style |
 | US-19 | User | Turn nudges off entirely | I'm not interrupted during deep focus |
 | US-20 | User | Pop the extension out into a floating window | I keep DHeer visible on a second screen |
+
+### Todos
+| ID | As a… | I want to… | So that… |
+|---|---|---|---|
+| US-22 | User | Create a todo with a title, priority, and status | I track action items alongside my saved links |
+| US-23 | User | Change a todo's status | I track progress through custom workflow stages |
+| US-24 | User | Delete a todo I no longer need | My task list stays focused and relevant |
 
 ---
 
@@ -271,6 +279,32 @@ A lightweight, opinionated bookmark manager that lives in the browser sidebar �
 | EXT-05 | Coexist mode | P1 | After first auto-close, user can reopen side panel alongside popup |
 | EXT-06 | Recent bookmarks | P1 | Last 5 saved bookmarks shown in the Bookmarks tab |
 | EXT-07 | Nudge settings in extension | P1 | Toggle and threshold slider in Companion tab; persists to DB |
+| EXT-08 | Config persistence across restarts | P1 | Companion config saved to chrome.storage.local; restored on service worker wake |
+
+---
+
+### 6.8 Bookmark Import
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| IMP-01 | Import from URL list | P1 | User pastes newline-separated URLs; valid ones are batch-inserted |
+| IMP-02 | Import from browser HTML export | P1 | Netscape HTML bookmark export parsed; title and URL extracted per link |
+| IMP-03 | Deduplication | P1 | URLs already in the user's library are silently skipped |
+| IMP-04 | Import result summary | P1 | Response reports how many bookmarks were imported and how many were duplicates |
+| IMP-05 | Import dialog in web app | P1 | "Import" button in the header opens a dialog with paste area and file format selector |
+
+---
+
+### 6.9 Todo Management
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|---|---|---|---|
+| TD-01 | Create todo | P1 | Title required; optional note, priority, and statusId |
+| TD-02 | Update todo | P1 | Any field patchable (title, note, priority, statusId) |
+| TD-03 | Delete todo | P1 | Todo removed; list updates immediately |
+| TD-04 | Custom statuses | P1 | Users can define named, colour-coded statuses; three defaults seeded on first use |
+| TD-05 | Todo panel — web | P1 | "My Tasks" in sidebar opens a sheet with full CRUD and status management |
+| TD-06 | Todo panel — extension | P1 | Todos tab in side panel mirrors web panel functionality |
 
 ---
 
@@ -297,7 +331,6 @@ The following are explicitly not planned for the current milestone:
 | Item | Rationale |
 |---|---|
 | Firefox / Safari extension | Manifest V3 migration complexity; Chrome is the primary platform |
-| Bookmark import (browser, Pocket) | Parsing complexity; defer to a dedicated import sprint |
 | Nested folders / collections | Conflicts with the flat, tag-based mental model |
 | Collaborative workspaces | Multi-user editing introduces significant backend complexity |
 | Browser history sync | Privacy-sensitive; outside current product scope |
@@ -316,7 +349,7 @@ The following are explicitly not planned for the current milestone:
 | R1 | Replit Auth OIDC unavailable outside Replit | High | Critical | Document migration path in Engineering.md; build auth abstraction layer |
 | R2 | Chrome changes side panel API behaviour | Medium | High | Monitor Chrome release notes; isolate panel logic in background.js |
 | R3 | GITHUB_TOKEN not available in isolated build environments | High | Medium | Use GitHub API from main agent where token is accessible |
-| R4 | Service worker terminated mid-session by Chrome | Medium | Medium | Persist config to chrome.storage; re-initialise on next startup |
+| R4 | Service worker terminated mid-session by Chrome | Medium | Medium | ✅ Mitigated — config persisted to chrome.storage.local on every UPDATE_CONFIG; restored on service worker restart via initSession() |
 | R5 | Tab overload nudges feel intrusive to users | Medium | Medium | Default threshold of 10; 10-min cooldown; easy one-click disable |
 
 ### External Dependencies
@@ -338,9 +371,10 @@ The following are explicitly not planned for the current milestone:
 | M1 — Core MVP | Bookmark CRUD, tags, search, Replit Auth, PostgreSQL | ✅ Complete |
 | M2 — Extension v1 | Side panel, companion stats, workspace launcher | ✅ Complete |
 | M3 — Sprint 1 | All 11 sprint tasks: nudge system, public feed attribution, search ILIKE, mobile nav, pop-out window | ✅ Complete |
-| M4 — Documentation | PRD, Engineering, Features, error log in docs/ | 🔄 In Progress |
-| M5 — Auth Portability | Decouple from Replit OIDC; support generic OIDC or local auth | 📋 Planned |
-| M6 — Extension v2 | Configurable backend URL; Firefox support; bookmark import | 📋 Planned |
+| M4 — Documentation | PRD, Engineering, Features, error log in docs/ pushed to GitHub documentation branch | ✅ Complete |
+| M5 — Import & Todos | Bookmark import (URL list + HTML), Todo management (web + extension), config persistence | ✅ Complete |
+| M6 — Auth Portability | Decouple from Replit OIDC; support generic OIDC or local auth | 📋 Planned |
+| M7 — Extension v2 | Configurable backend URL; Firefox support | 📋 Planned |
 
 ---
 
@@ -359,6 +393,9 @@ bookmark_tags(id, bookmarkId, tagId)
 workspaces(id, userId, name, urls[], createdAt)
 companion_settings(id, userId, trackingEnabled, nudgesEnabled,
                    tabCountThreshold, idleThreshold, nudgeFrequency)
+
+todo_statuses(id, userId, name, color, sortOrder)
+todos(id, userId, title, note, priority, statusId, createdAt, updatedAt)
 ```
 
 ### B. API Surface
@@ -368,17 +405,27 @@ companion_settings(id, userId, trackingEnabled, nudgesEnabled,
 | GET | /api/auth/user | Required | Current user profile |
 | GET | /api/bookmarks | Required | List bookmarks; supports ?search= and ?tag= |
 | POST | /api/bookmarks | Required | Create a bookmark |
+| GET | /api/bookmarks/:id | Required | Get a single bookmark by ID |
 | PUT | /api/bookmarks/:id | Required | Update a bookmark |
 | DELETE | /api/bookmarks/:id | Required | Delete a bookmark |
+| POST | /api/bookmarks/import | Required | Import bookmarks from URL list or browser HTML export |
 | GET | /api/tags | Required | List all user tags |
 | PATCH | /api/tags/:id | Required | Rename a tag |
 | DELETE | /api/tags/:id | Required | Delete a tag |
-| GET | /api/public | None | All public bookmarks with author attribution |
+| GET | /api/public/bookmarks | None | All public bookmarks with author attribution |
 | GET | /api/workspaces | Required | List workspaces |
 | POST | /api/workspaces | Required | Create a workspace |
 | DELETE | /api/workspaces/:id | Required | Delete a workspace |
 | GET | /api/companion/settings | Required | Get companion config |
 | PATCH | /api/companion/settings | Required | Update one or more companion settings |
+| GET | /api/todo-statuses | Required | List todo status definitions (seeds 3 defaults on first call) |
+| POST | /api/todo-statuses | Required | Create a custom status |
+| PATCH | /api/todo-statuses/:id | Required | Update a status name, colour, or sort order |
+| DELETE | /api/todo-statuses/:id | Required | Delete a status; associated todos set statusId to null |
+| GET | /api/todos | Required | List all todos for the user |
+| POST | /api/todos | Required | Create a todo |
+| PATCH | /api/todos/:id | Required | Partially update a todo |
+| DELETE | /api/todos/:id | Required | Delete a todo |
 
 ### C. Extension Message Protocol
 
@@ -386,7 +433,7 @@ companion_settings(id, userId, trackingEnabled, nudgesEnabled,
 |---|---|---|
 | GET_SESSION_METADATA | Panel → Background | Request current tab and session stats |
 | SESSION_METADATA_UPDATE | Background → Panel | Push live stats on every tab switch |
-| UPDATE_CONFIG | Panel → Background | Sync companion settings to service worker |
+| UPDATE_CONFIG | Panel → Background | Sync companion settings to service worker and persist to chrome.storage.local |
 | COMPANION_NUDGE | Background → Panel | Show in-panel nudge banner for 8 seconds |
 | LAUNCH_WORKSPACE | Panel → Background | Open all workspace URLs in a new Chrome window |
 | POPUP_CREATED | Panel → Background | Notify background that popup opened; trigger side panel close |
