@@ -376,11 +376,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     const { popupWindowId, sourceTabId } = request;
     popupState = { windowId: popupWindowId, sourceTabId: sourceTabId ?? null };
     if (sourceTabId != null) {
-      // Close the side panel once by disabling it, then immediately re-enable it.
-      // Re-enabling does NOT reopen it — it just makes it available via the
-      // extension icon again so the user can choose to have both open simultaneously.
+      // 1. Disable the panel — this closes it immediately.
+      // 2. Wait 800 ms so Chrome has time to render the close before we re-enable.
+      // 3. Re-enable (does NOT reopen) so the user can click the icon to have both open.
       chrome.sidePanel
         .setOptions({ tabId: sourceTabId, enabled: false })
+        .then(() => new Promise(resolve => setTimeout(resolve, 800)))
         .then(() => chrome.sidePanel.setOptions({ tabId: sourceTabId, enabled: true }))
         .catch(() => {});
     }
